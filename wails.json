@@ -10,7 +10,7 @@
   "info": {
     "companyName": "OmbuServer",
     "productName": "OmbuServer Launcher",
-    "productVersion": "1.1.1",
+    "productVersion": "1.1.2",
     "copyright": "OmbuServer. Basado en el launcher de Slashdiablo (MIT, (c) 2019 Stefan Konno).",
     "comments": "Launcher de OmbuServer para Diablo II 1.14b"
   }
