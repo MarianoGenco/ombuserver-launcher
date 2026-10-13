@@ -1,0 +1,53 @@
+# Compila OmbuServer.exe desde este repositorio, en una máquina Windows de GitHub.
+# Es el .exe que se publica: así se puede verificar que sale de este código (y, más adelante, firmarlo con SignPath).
+# Las direcciones del servidor no están en el código: salen de los secretos del repositorio (OMBU_WEB, OMBU_JUEGO).
+name: Compilar
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Instalar Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+
+      - name: Pruebas
+        run: go vet ./... && go test ./...
+
+      - name: Compilar
+        env:
+          OMBU_WEB: ${{ secrets.OMBU_WEB }}
+          OMBU_JUEGO: ${{ secrets.OMBU_JUEGO }}
+        run: |
+          if [ -z "$OMBU_WEB" ] || [ -z "$OMBU_JUEGO" ]; then echo "faltan los secretos OMBU_WEB y OMBU_JUEGO"; exit 1; fi
+          M=ombuserver-launcher
+          X="-X $M/ombu.URLContenido=http://$OMBU_WEB/contenido/ -X $M/ombu.IPRealm=$OMBU_JUEGO"
+          X="$X -X main.URLDescargas=http://$OMBU_WEB/descargas/ -X main.urlVoz=https://$OMBU_WEB/"
+          wails build -platform windows/amd64 -trimpath -ldflags "-s -w $X"
+          EXE=build/bin/OmbuServer.exe
+          grep -aq "$OMBU_JUEGO" "$EXE" && grep -aq "http://$OMBU_WEB/contenido/" "$EXE" || { echo "el .exe no quedó con las direcciones"; exit 1; }
+          VERSION=$(sed -n 's/^const Version = "\([0-9.]*\)"/\1/p' main.go)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          sha256sum "$EXE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OmbuServer-${{ env.VERSION }}
+          path: build/bin/OmbuServer.exe
+          if-no-files-found: error

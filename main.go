@@ -25,6 +25,8 @@ const Version = "1.0.2"
 func main() {
 	limpiarActualizacion()
 	app := NuevaApp()
+	graficos := nuevosGraficos() // figuras del chat: las baja del servidor (graficos.go)
+	go graficos.precargar()
 	err := wails.Run(&options.App{
 		Title:            "OmbuServer",
 		Width:            1024,
@@ -32,7 +34,7 @@ func main() {
 		DisableResize:    true,
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 8, G: 9, B: 16, A: 255},
-		AssetServer:      &assetserver.Options{Assets: assets},
+		AssetServer:      &assetserver.Options{Assets: assets, Handler: graficos},
 		OnStartup:        app.startup,
 		Bind:             []interface{}{app},
 		// Un solo launcher abierto: si lo abren de nuevo, se trae al frente el que ya está.
