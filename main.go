@@ -21,7 +21,7 @@ import (
 var assets embed.FS
 
 // Version del launcher (se muestra abajo a la derecha).
-const Version = "1.0.9"
+const Version = "1.1.0"
 
 func main() {
 	limpiarActualizacion()
@@ -36,6 +36,7 @@ func main() {
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 8, G: 9, B: 16, A: 255},
 		AssetServer:      &assetserver.Options{Assets: assets, Handler: graficos},
+		OnShutdown:       app.cerrarPrueba, // cierra los juegos de la prueba de carga (si la hubo)
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
 			go graficos.precargar()

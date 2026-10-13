@@ -8,10 +8,18 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
+
+	"ombuserver-launcher/ombu"
 )
 
-// Autologueo del modo de prueba de carga (prueba_carga.go): escribe en la ventana del juego como si fuera el teclado,
-// con mensajes de ventana (no hace falta que tenga el foco).
+// Autologueo del modo de prueba de carga (prueba_carga.go). Lo que se aprendió probando:
+//   - el juego toma las letras como carácter (WM_CHAR); si además se manda la tecla (WM_KEYDOWN) las escribe dos veces;
+//   - el Tab mandado desde afuera no cambia de campo (ni como tecla ni como carácter);
+//   - al armar la pantalla de login, el juego lee la cuenta recordada ("Last BNet" en HKCU\...\Diablo II; Game.exe
+//     0x430920): si hay una, la escribe y pone el cursor en la contraseña.
+// Por eso, por cada ventana: se graba su cuenta como recordada, se abre el juego, se espera la pantalla de login y se
+// escribe solo la contraseña. Recién entonces se pasa a la siguiente (si no, se pisarían la cuenta recordada).
 
 var (
 	user32                 = windows.NewLazySystemDLL("user32.dll")
@@ -23,15 +31,15 @@ var (
 )
 
 const (
-	wmActivate    = 0x0006
-	wmSetFocus    = 0x0007
-	wmActivateApp = 0x001C
-	wmKeyDown     = 0x0100
-	wmKeyUp       = 0x0101
-	wmChar        = 0x0102
-	vkBack        = 0x08
-	vkTab         = 0x09
-	vkReturn      = 0x0D
+	wmActivate     = 0x0006
+	wmSetFocus     = 0x0007
+	wmActivateApp  = 0x001C
+	wmKeyDown      = 0x0100
+	wmKeyUp        = 0x0101
+	wmChar         = 0x0102
+	vkBack         = 0x08
+	vkReturn       = 0x0D
+	cuentaGuardada = "Last BNet"
 )
 
 // ventanaDe busca la ventana visible del proceso (espera hasta 90 s a que aparezca).
@@ -66,7 +74,7 @@ func tecla(h uintptr, vk uintptr) {
 	time.Sleep(40 * time.Millisecond)
 }
 
-// escribir: cada letra como carácter (WM_CHAR). Con la tecla además (WM_KEYDOWN) el juego la escribe dos veces.
+// escribir: cada letra como carácter (WM_CHAR).
 func escribir(h uintptr, texto string) {
 	for _, r := range texto {
 		postMessage.Call(h, wmChar, uintptr(r), 1)
@@ -74,8 +82,7 @@ func escribir(h uintptr, texto string) {
 	}
 }
 
-// activar: los mensajes que manda Windows al hacer clic en la ventana. El juego ignora el teclado si cree que no
-// está activa.
+// activar: los mensajes que manda Windows al hacer clic en la ventana.
 func activar(h uintptr) {
 	postMessage.Call(h, wmActivateApp, 1, 0)
 	postMessage.Call(h, wmActivate, 1, 0)
@@ -83,38 +90,57 @@ func activar(h uintptr) {
 	time.Sleep(200 * time.Millisecond)
 }
 
-// autologuear: en la pantalla de Battle.net borra el campo de cuenta, escribe cuenta, Tab, contraseña, Enter; y
-// después Enter para entrar con el primer personaje.
-func autologuear(pid int, c cuentaPrueba, p *pruebaCarga) {
-	defer func() {
-		if r := recover(); r != nil {
-			anotarPrueba("%s: falla en el autologueo: %v", c.cuenta, r)
-		}
-	}()
+// cuentaRecordada / recordarCuenta: la cuenta que el juego pone sola en la pantalla de login.
+func cuentaRecordada() (string, bool) {
+	k, err := registry.OpenKey(registry.CURRENT_USER, ombu.ClaveDiablo, registry.QUERY_VALUE)
+	if err != nil {
+		return "", false
+	}
+	defer k.Close()
+	v, _, err := k.GetStringValue(cuentaGuardada)
+	return v, err == nil
+}
+
+func recordarCuenta(cuenta string, hay bool) {
+	k, _, err := registry.CreateKey(registry.CURRENT_USER, ombu.ClaveDiablo, registry.SET_VALUE)
+	if err != nil {
+		return
+	}
+	defer k.Close()
+	if hay {
+		k.SetStringValue(cuentaGuardada, cuenta)
+	} else {
+		k.DeleteValue(cuentaGuardada)
+	}
+}
+
+// loguearVentana: con la cuenta ya recordada, espera la pantalla de login del proceso y escribe la contraseña.
+// Devuelve la ventana (0 si no apareció) para entrar después con el personaje.
+func loguearVentana(pid int, c cuentaPrueba, p *pruebaCarga) uintptr {
 	h := ventanaDe(pid)
 	if h == 0 {
 		anotarPrueba("%s: no apareció la ventana del juego (proceso %d) en 90 s", c.cuenta, pid)
-		return
+		return 0
 	}
-	anotarPrueba("%s: ventana %#x del proceso %d; escribe en %v", c.cuenta, h, pid, p.esperaLogin)
+	anotarPrueba("%s: ventana %#x del proceso %d; escribe la contraseña en %v", c.cuenta, h, pid, p.esperaLogin)
 	time.Sleep(p.esperaLogin)
 	if v, _, _ := isWindowVisible.Call(h); v == 0 {
 		anotarPrueba("%s: la ventana ya no está (¿se cerró el juego?)", c.cuenta)
-		return
+		return 0
 	}
 	activar(h)
 	for i := 0; i < 16; i++ {
 		tecla(h, vkBack)
 	}
-	escribir(h, c.cuenta)
-	escribir(h, "\t") // al campo de la contraseña: como tecla (WM_KEYDOWN) el juego no lo toma, como carácter sí
-	for i := 0; i < 16; i++ {
-		tecla(h, vkBack)
-	}
 	escribir(h, c.clave)
 	tecla(h, vkReturn)
-	anotarPrueba("%s: cuenta y contraseña escritas; entra con el personaje en %v", c.cuenta, p.esperaPersonaje)
-	time.Sleep(p.esperaPersonaje)
+	anotarPrueba("%s: contraseña escrita y Enter", c.cuenta)
+	return h
+}
+
+// entrarPersonaje: Enter en la elección de personaje (entra con el primero).
+func entrarPersonaje(h uintptr, c cuentaPrueba, espera time.Duration) {
+	time.Sleep(espera)
 	activar(h)
 	tecla(h, vkReturn)
 	anotarPrueba("%s: Enter en la elección de personaje", c.cuenta)

@@ -31,6 +31,7 @@ type App struct {
 	juego   *ombu.Manifiesto // archivos del juego publicados (se baja una vez por sesión)
 	sesion  sesionChat       // chat de Battle.net (chat_app.go)
 	ptt     teclaHablar      // tecla para hablar en la voz (voz.go)
+	prueba  juegosPrueba     // juegos abiertos por la prueba de carga: se cierran con el launcher (prueba_carga.go)
 }
 
 func NuevaApp() *App {
@@ -338,15 +339,12 @@ func (a *App) Jugar() error {
 		banderas = append(banderas, "-ns")
 	}
 	a.antesDeJugar()
-	ventanas := cfg.Ventanas
-	prueba := leerPruebaCarga() // modo de prueba de carga (prueba_carga.go): una ventana por cuenta, con autologueo
-	if prueba != nil {
-		ventanas = len(prueba.cuentas)
+	if prueba := leerPruebaCarga(); prueba != nil { // modo de prueba de carga (prueba_carga.go)
+		return a.jugarPrueba(cfg, banderas, prueba)
 	}
+	ventanas := cfg.Ventanas
 	for i := 0; i < ventanas; i++ {
-		if prueba != nil {
-			a.avisar(fmt.Sprintf("Prueba de carga: %s (%d de %d)…", prueba.cuentas[i].cuenta, i+1, ventanas), -1)
-		} else if ventanas > 1 {
+		if ventanas > 1 {
 			a.avisar(fmt.Sprintf("Abriendo Diablo II (%d de %d)…", i+1, ventanas), -1)
 		} else {
 			a.avisar("Abriendo Diablo II…", -1)
@@ -356,9 +354,6 @@ func (a *App) Jugar() error {
 			return fmt.Errorf("no se pudo abrir Game.exe: %v", err)
 		}
 		a.vigilarJuego(cmd)
-		if prueba != nil {
-			go autologuear(cmd.Process.Pid, prueba.cuentas[i], prueba)
-		}
 		if i < ventanas-1 {
 			time.Sleep(time.Duration(cfg.Demora) * time.Second)
 		}
