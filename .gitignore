@@ -1,0 +1,10 @@
+# Compilados
+build/bin/
+# Generado por wails build
+frontend/wailsjs/
+# Scripts de publicación del operador (infraestructura privada)
+publicar.sh
+publicar-juego.sh
+# Figuras del chat: salen de los archivos del juego (Blizzard); las genera D2GS/MOD/chat_graficos.py y van
+# dentro del launcher, pero no se publican sueltas en el repo
+frontend/dist/img/chat/

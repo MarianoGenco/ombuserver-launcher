@@ -1,0 +1,17 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "OmbuServer Launcher",
+  "outputfilename": "OmbuServer",
+  "frontend:dir": "frontend",
+  "frontend:install": "",
+  "frontend:build": "",
+  "wailsjsdir": "",
+  "author": { "name": "OmbuServer" },
+  "info": {
+    "companyName": "OmbuServer",
+    "productName": "OmbuServer Launcher",
+    "productVersion": "1.0.2",
+    "copyright": "OmbuServer. Basado en el launcher de Slashdiablo (MIT, (c) 2019 Stefan Konno).",
+    "comments": "Launcher de OmbuServer para Diablo II 1.14b"
+  }
+}

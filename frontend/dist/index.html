@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>OmbuServer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="fondo"></div>
+
+  <header class="barra" style="--wails-draggable:drag">
+    <nav class="menu">
+      <button class="menu-item activo" data-vista="inicio">Inicio</button>
+      <button class="menu-item" data-vista="chat">Chat</button>
+      <button class="menu-item" data-vista="opciones">Configuración</button>
+    </nav>
+    <div class="controles">
+      <button class="control" id="minimizar" title="Minimizar">
+        <svg viewBox="0 0 12 12"><path d="M2 6.5h8" /></svg>
+      </button>
+      <button class="control cerrar" id="cerrar" title="Cerrar">
+        <svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="principal" id="principal">
+    <section class="izquierda">
+      <div class="marca">
+        <img class="logo" src="img/logo-sin-luz.png" alt="OmbuServer">
+        <p class="subtitulo">Diablo II · Lord of Destruction 1.14b</p>
+      </div>
+
+      <div class="pie">
+        <p class="estado" id="estado"><span class="punto"></span><span id="estado-texto">Revisando…</span></p>
+        <div class="accion">
+          <button class="carpeta" id="carpeta" title="Cambiar la carpeta del juego">
+            <span class="carpeta-etiqueta">Carpeta del juego</span>
+            <span class="carpeta-ruta" id="carpeta-ruta">Elegir…</span>
+          </button>
+          <button class="jugar" id="jugar" disabled>
+            <span class="jugar-relleno" id="jugar-relleno"></span>
+            <span class="jugar-texto" id="jugar-texto">Jugar</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="derecha">
+      <h2 class="titulo-panel">Novedades</h2>
+      <div class="noticias" id="noticias"></div>
+      <p class="version" id="version"></p>
+    </aside>
+  </main>
+
+  <section class="vista-opciones" id="opciones" hidden>
+    <nav class="secciones">
+      <button class="seccion activa" data-seccion="juego">Juego</button>
+      <button class="seccion" data-seccion="jugar">Al jugar</button>
+      <button class="seccion" data-seccion="voz">Voz</button>
+      <button class="seccion" data-seccion="acerca">Acerca de</button>
+      <p class="guardado" id="guardado">Guardado</p>
+    </nav>
+
+    <div class="opciones-cuerpo">
+      <div class="grupo" data-seccion="juego">
+        <h2 class="grupo-titulo">Juego</h2>
+        <div class="campo">
+          <span class="campo-nombre">Carpeta de Diablo II</span>
+          <span class="campo-ayuda">La carpeta donde está Game.exe (Diablo II: Lord of Destruction 1.14b).</span>
+          <div class="fila">
+            <span class="ruta" id="op-carpeta">Sin elegir</span>
+            <button class="boton" id="op-cambiar">Cambiar…</button>
+            <button class="boton" id="op-abrir-juego">Abrir</button>
+          </div>
+          <p class="nota" id="op-carpeta-estado"></p>
+        </div>
+      </div>
+
+      <div class="grupo" data-seccion="jugar" hidden>
+        <h2 class="grupo-titulo">Al jugar</h2>
+        <div class="campo fila-campo">
+          <div>
+            <span class="campo-nombre">Ventanas de Diablo II</span>
+            <span class="campo-ayuda">Cuántos juegos se abren al tocar JUGAR.</span>
+          </div>
+          <div class="contador" data-campo="ventanas">
+            <button class="menos" aria-label="Menos">−</button><span class="valor" id="op-ventanas">1</span><button class="mas" aria-label="Más">+</button>
+          </div>
+        </div>
+        <div class="campo fila-campo" id="campo-demora">
+          <div>
+            <span class="campo-nombre">Espera entre ventanas</span>
+            <span class="campo-ayuda">Segundos entre un juego y el siguiente.</span>
+          </div>
+          <div class="contador" data-campo="demora">
+            <button class="menos" aria-label="Menos">−</button><span class="valor" id="op-demora">3</span><button class="mas" aria-label="Más">+</button>
+          </div>
+        </div>
+        <div class="campo fila-campo">
+          <div>
+            <span class="campo-nombre">Modo ventana</span>
+            <span class="campo-ayuda">Abre el juego en una ventana en lugar de pantalla completa.</span>
+          </div>
+          <button class="interruptor" id="op-ventana" role="switch" aria-checked="true"><span></span></button>
+        </div>
+        <div class="campo fila-campo">
+          <div>
+            <span class="campo-nombre">Sonido</span>
+            <span class="campo-ayuda">Sonido y música del juego.</span>
+          </div>
+          <button class="interruptor" id="op-sonido" role="switch" aria-checked="true"><span></span></button>
+        </div>
+        <div class="campo fila-campo">
+          <div>
+            <span class="campo-nombre">Idioma del juego</span>
+            <span class="campo-ayuda">Textos y menús del juego.</span>
+          </div>
+          <div class="segmentos" id="op-idioma">
+            <button data-idioma="1" translate="no">Español</button><button data-idioma="0" translate="no">English</button>
+          </div>
+        </div>
+        <div class="campo fila-campo" id="campo-escala">
+          <div>
+            <span class="campo-nombre">Tamaño de ventana</span>
+            <span class="campo-ayuda">El juego se ve igual para todos, solo más grande.</span>
+          </div>
+          <div class="segmentos" id="op-escala">
+            <button data-escala="100">800×600</button><button data-escala="150">1200×900</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grupo" data-seccion="voz" hidden>
+        <h2 class="grupo-titulo">Voz</h2>
+        <p class="nota voz-nota">La voz anda en los canales privados: creá uno con <b>/join nombre</b> y tus amigos entran con el mismo comando.</p>
+        <div class="campo fila-campo">
+          <div>
+            <span class="campo-nombre">Cómo hablar</span>
+            <span class="campo-ayuda">Con una tecla (anda aunque estés jugando) o solo, cuando detecta tu voz.</span>
+          </div>
+          <div class="segmentos" id="op-voz-modo">
+            <button data-modo="0">Tecla para hablar</button><button data-modo="1">Detección de voz</button>
+          </div>
+        </div>
+        <div class="campo fila-campo" id="campo-voz-tecla">
+          <div>
+            <span class="campo-nombre">Tecla para hablar</span>
+            <span class="campo-ayuda" id="op-voz-tecla-ayuda">Mantenela apretada mientras hablás. Sirve una tecla o un botón del mouse.</span>
+          </div>
+          <button class="boton tecla-voz" id="op-voz-tecla">Mouse 4</button>
+        </div>
+        <div class="campo" id="campo-voz-sensibilidad">
+          <div class="fila-campo">
+            <div>
+              <span class="campo-nombre">Sensibilidad</span>
+              <span class="campo-ayuda">Más alta: capta la voz baja (y también ruidos). Probá hasta que la barra pase la marca solo cuando hablás.</span>
+            </div>
+            <button class="boton" id="op-voz-probar">Probar micrófono</button>
+          </div>
+          <input type="range" class="rango" id="op-voz-sensibilidad" min="0" max="100" step="1" value="50">
+          <div class="medidor"><div class="medidor-nivel" id="voz-medidor-nivel"></div><div class="medidor-umbral" id="voz-medidor-umbral"></div></div>
+        </div>
+      </div>
+
+      <div class="grupo" data-seccion="acerca" hidden>
+        <h2 class="grupo-titulo">Acerca de</h2>
+        <div class="campo fila-campo">
+          <div>
+            <span class="campo-nombre">Idioma del launcher</span>
+            <span class="campo-ayuda">Textos del launcher y mensajes del chat.</span>
+          </div>
+          <div class="segmentos" id="op-idioma-launcher">
+            <button data-idioma-launcher="es" translate="no">Español</button><button data-idioma-launcher="en" translate="no">English</button>
+          </div>
+        </div>
+        <dl class="datos">
+          <dt>Versión del launcher</dt><dd id="ac-version">—</dd>
+          <dt>Servidor</dt><dd id="ac-servidor">—</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="vista-chat" id="chat" hidden>
+    <!-- Sin sesión: login -->
+    <div class="chat-login" id="chat-login">
+      <form class="login" id="login-form" autocomplete="off">
+        <img class="login-logo" src="img/logo-sin-luz.png" alt="OmbuServer">
+        <h2 class="login-titulo" id="login-titulo">Chat de Battle.net</h2>
+        <label class="login-campo">
+          <span>Cuenta</span>
+          <input id="login-cuenta" maxlength="15" spellcheck="false">
+        </label>
+        <label class="login-campo">
+          <span>Contraseña</span>
+          <input id="login-clave" type="password" maxlength="30">
+        </label>
+        <label class="login-recordar" id="login-recordar-campo">
+          <input id="login-recordar" type="checkbox" checked><span class="caja"></span>Recordarme
+        </label>
+        <p class="login-mensaje" id="login-mensaje"></p>
+        <div class="login-botones">
+          <button type="submit" class="boton primario" id="login-entrar">Entrar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Con sesión: el chat -->
+    <div class="chat-sala" id="chat-sala" hidden>
+      <div class="sala-cabecera">
+        <button class="sala-canal" id="sala-canal" title="Cambiar de canal"><span id="sala-canal-nombre" translate="no">OmbuServer</span> (<span id="sala-cantidad">0</span>)</button>
+        <form class="sala-unirse" id="sala-unirse" hidden>
+          <input id="sala-unirse-nombre" placeholder="Nombre del canal" maxlength="30" spellcheck="false">
+          <button type="submit" class="boton">Entrar</button>
+        </form>
+        <span class="sala-aviso" id="sala-aviso"></span>
+        <button class="sala-salir" id="sala-salir" title="Cerrar la sesión del chat">Salir</button>
+      </div>
+      <div class="sala-mensajes" id="sala-mensajes"></div>
+      <form class="sala-escribir" id="sala-escribir" autocomplete="off">
+        <input id="sala-texto" maxlength="220" spellcheck="false" placeholder="Escribí un mensaje…">
+        <button type="button" class="voz-mic" id="voz-mic" hidden title="Entrar a la voz del canal">
+          <svg viewBox="0 -0.5 24 24" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+          <span class="voz-raya"></span><span class="voz-cuantos" id="voz-cuantos"></span>
+        </button>
+      </form>
+      <div class="voz-panel" id="voz-panel" hidden>
+        <div class="voz-panel-estado" id="voz-estado"></div>
+        <button id="voz-silenciar">Silenciar micrófono</button>
+        <button id="voz-reintentar" hidden>Probar el micrófono de nuevo</button>
+        <button id="voz-salir" class="peligro">Salir de la voz</button>
+      </div>
+      <div class="sala-tira">
+        <div class="sala-usuarios" id="sala-usuarios" translate="no"></div>
+        <div class="tira-control">
+          <img class="tira-columna" src="img/chat/tira-columna.png" alt="">
+          <button class="tira-boton" style="left:2px;top:11px" data-paso="-1" data-reposo="5" data-apretada="4" title="Anterior"><img src="img/chat/tira-flecha-5.png" alt="Anterior"></button>
+          <button class="tira-boton" style="left:30px;top:12px" data-paso="1" data-reposo="7" data-apretada="6" title="Siguiente"><img src="img/chat/tira-flecha-7.png" alt="Siguiente"></button>
+          <button class="tira-boton" style="left:2px;top:59px" data-paso="-8" data-reposo="1" data-apretada="0" title="Página anterior"><img src="img/chat/tira-flecha-1.png" alt="Página anterior"></button>
+          <button class="tira-boton" style="left:30px;top:59px" data-paso="8" data-reposo="3" data-apretada="2" title="Página siguiente"><img src="img/chat/tira-flecha-3.png" alt="Página siguiente"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="menu-persona" id="menu-persona" hidden></div>
+  <div id="voz-audio" hidden></div>
+  <script src="vendor/livekit-client.umd.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script src="voz.js"></script>
+</body>
+</html>
