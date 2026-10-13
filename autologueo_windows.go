@@ -28,11 +28,11 @@ const (
 	wmSetFocus    = 0x0007
 	wmActivateApp = 0x001C
 	wmKeyDown     = 0x0100
-	wmKeyUp   = 0x0101
-	wmChar    = 0x0102
-	vkBack    = 0x08
-	vkTab     = 0x09
-	vkReturn  = 0x0D
+	wmKeyUp       = 0x0101
+	wmChar        = 0x0102
+	vkBack        = 0x08
+	vkTab         = 0x09
+	vkReturn      = 0x0D
 )
 
 // ventanaDe busca la ventana visible del proceso (espera hasta 90 s a que aparezca).
