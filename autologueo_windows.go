@@ -20,7 +20,6 @@ var (
 	isWindowVisible        = user32.NewProc("IsWindowVisible")
 	postMessage            = user32.NewProc("PostMessageW")
 	mapVirtualKey          = user32.NewProc("MapVirtualKeyW")
-	vkKeyScan              = user32.NewProc("VkKeyScanW")
 )
 
 const (
@@ -67,16 +66,10 @@ func tecla(h uintptr, vk uintptr) {
 	time.Sleep(40 * time.Millisecond)
 }
 
-// escribir: cada letra como un teclado real (tecla apretada, carácter, tecla soltada): el juego puede leer cualquiera.
+// escribir: cada letra como carácter (WM_CHAR). Con la tecla además (WM_KEYDOWN) el juego la escribe dos veces.
 func escribir(h uintptr, texto string) {
 	for _, r := range texto {
-		k, _, _ := vkKeyScan.Call(uintptr(r))
-		vk := k & 0xff
-		sc, _, _ := mapVirtualKey.Call(vk, 0)
-		postMessage.Call(h, wmKeyDown, vk, 1|sc<<16)
-		postMessage.Call(h, wmChar, uintptr(r), 1|sc<<16)
-		time.Sleep(30 * time.Millisecond)
-		postMessage.Call(h, wmKeyUp, vk, 1|sc<<16|1<<30|1<<31)
+		postMessage.Call(h, wmChar, uintptr(r), 1)
 		time.Sleep(40 * time.Millisecond)
 	}
 }
@@ -114,7 +107,7 @@ func autologuear(pid int, c cuentaPrueba, p *pruebaCarga) {
 		tecla(h, vkBack)
 	}
 	escribir(h, c.cuenta)
-	tecla(h, vkTab)
+	escribir(h, "\t") // al campo de la contraseña: como tecla (WM_KEYDOWN) el juego no lo toma, como carácter sí
 	for i := 0; i < 16; i++ {
 		tecla(h, vkBack)
 	}
