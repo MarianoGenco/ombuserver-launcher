@@ -63,6 +63,19 @@ wails build -platform windows/amd64 -trimpath -ldflags "-s -w \
 | `frontend/dist/voz.js`, `i18n.js` | La voz del chat y la traducción al inglés |
 | `frontend/dist/vendor/` | [livekit-client](https://github.com/livekit/client-sdk-js) 2.22.3 (Apache 2.0), sin cambios |
 
+## Code signing policy / Firma de código
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org) *(pending approval)*. Releases are built from this repository on GitHub
+Actions (`.github/workflows/compilar.yml`) and every release is manually approved before signing.
+
+- Committers and reviewers: [Mariano Genco](https://github.com/MarianoGenco)
+- Approvers: [Mariano Genco](https://github.com/MarianoGenco)
+
+Política completa y privacidad / full policy and privacy: <https://ombuserver.online/firma.html>.
+This program will not transfer any information to other networked systems unless specifically requested by the user
+or the person installing or operating it (it only talks to OmbuServer's own servers: updates, chat and voice).
+
 ## Licencia
 
 MIT (ver `LICENSE`). El diseño está basado en [slashdiablo-launcher](https://github.com/nokka/slashdiablo-launcher)
