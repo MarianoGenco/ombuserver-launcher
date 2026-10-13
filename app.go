@@ -344,7 +344,9 @@ func (a *App) Jugar() error {
 		ventanas = len(prueba.cuentas)
 	}
 	for i := 0; i < ventanas; i++ {
-		if ventanas > 1 {
+		if prueba != nil {
+			a.avisar(fmt.Sprintf("Prueba de carga: %s (%d de %d)…", prueba.cuentas[i].cuenta, i+1, ventanas), -1)
+		} else if ventanas > 1 {
 			a.avisar(fmt.Sprintf("Abriendo Diablo II (%d de %d)…", i+1, ventanas), -1)
 		} else {
 			a.avisar("Abriendo Diablo II…", -1)

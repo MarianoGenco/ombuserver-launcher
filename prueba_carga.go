@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,6 +21,20 @@ import (
 //	espera_personaje 8     (opcional: segundos desde el login hasta entrar con el personaje)
 
 const archivoPruebaCarga = "prueba-carga.txt"
+
+// anotarPrueba agrega una línea a prueba-carga.log (junto al .txt), para ver qué hizo el autologueo en cada ventana.
+func anotarPrueba(formato string, args ...any) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(filepath.Dir(exe), "prueba-carga.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s  %s\r\n", time.Now().Format("15:04:05"), fmt.Sprintf(formato, args...))
+}
 
 type cuentaPrueba struct{ cuenta, clave string }
 
@@ -58,10 +73,12 @@ func leerPruebaCarga() *pruebaCarga {
 		p.cuentas = append(p.cuentas, cuentaPrueba{campos[0], campos[1]})
 	}
 	if len(p.cuentas) == 0 {
+		anotarPrueba("%s no tiene cuentas: JUGAR funciona como siempre", archivoPruebaCarga)
 		return nil
 	}
 	if len(p.cuentas) > 64 {
 		p.cuentas = p.cuentas[:64]
 	}
+	anotarPrueba("modo prueba: %d cuentas, espera_login %v, espera_personaje %v", len(p.cuentas), p.esperaLogin, p.esperaPersonaje)
 	return p
 }

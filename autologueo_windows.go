@@ -75,9 +75,15 @@ func escribir(h uintptr, texto string) {
 func autologuear(pid int, c cuentaPrueba, p *pruebaCarga) {
 	h := ventanaDe(pid)
 	if h == 0 {
+		anotarPrueba("%s: no apareció la ventana del juego (proceso %d) en 90 s", c.cuenta, pid)
 		return
 	}
+	anotarPrueba("%s: ventana %#x del proceso %d; escribe en %v", c.cuenta, h, pid, p.esperaLogin)
 	time.Sleep(p.esperaLogin)
+	if v, _, _ := isWindowVisible.Call(h); v == 0 {
+		anotarPrueba("%s: la ventana ya no está (¿se cerró el juego?)", c.cuenta)
+		return
+	}
 	for i := 0; i < 16; i++ {
 		tecla(h, vkBack)
 	}
@@ -88,6 +94,8 @@ func autologuear(pid int, c cuentaPrueba, p *pruebaCarga) {
 	}
 	escribir(h, c.clave)
 	tecla(h, vkReturn)
+	anotarPrueba("%s: cuenta y contraseña escritas; entra con el personaje en %v", c.cuenta, p.esperaPersonaje)
 	time.Sleep(p.esperaPersonaje)
 	tecla(h, vkReturn)
+	anotarPrueba("%s: Enter en la elección de personaje", c.cuenta)
 }
