@@ -31,6 +31,25 @@ type App struct {
 	juego   *ombu.Manifiesto // archivos del juego publicados (se baja una vez por sesión)
 	sesion  sesionChat       // chat de Battle.net (chat_app.go)
 	ptt     teclaHablar      // tecla para hablar en la voz (voz.go)
+
+	// juegos abiertos con JUGAR: se cierran al cerrar el launcher (salvo cuando se cierra para actualizarse)
+	juegosMu       sync.Mutex
+	juegos         []*os.Process
+	actualizandose bool
+}
+
+// cerrarJuegos: al cerrar el launcher, cierra los Diablo II que abrió (pedido del usuario). Si se cierra para abrir
+// la versión nueva, no los toca.
+func (a *App) cerrarJuegos(context.Context) {
+	a.juegosMu.Lock()
+	defer a.juegosMu.Unlock()
+	if a.actualizandose {
+		return
+	}
+	for _, p := range a.juegos {
+		p.Kill() // si ya se cerró, no hace nada
+	}
+	a.juegos = nil
 }
 
 func NuevaApp() *App {
@@ -274,6 +293,9 @@ func (a *App) Actualizar() (bool, error) {
 		a.avisar("Abriendo la versión nueva…", -1)
 		go func() {
 			time.Sleep(400 * time.Millisecond)
+			a.juegosMu.Lock()
+			a.actualizandose = true // se cierra para abrir la versión nueva: los juegos quedan abiertos
+			a.juegosMu.Unlock()
 			runtime.Quit(a.ctx)
 		}()
 		return true, nil
@@ -349,6 +371,9 @@ func (a *App) Jugar() error {
 			return fmt.Errorf("no se pudo abrir Game.exe: %v", err)
 		}
 		a.vigilarJuego(cmd)
+		a.juegosMu.Lock()
+		a.juegos = append(a.juegos, cmd.Process)
+		a.juegosMu.Unlock()
 		if i < cfg.Ventanas-1 {
 			time.Sleep(time.Duration(cfg.Demora) * time.Second)
 		}

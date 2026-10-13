@@ -21,7 +21,7 @@ import (
 var assets embed.FS
 
 // Version del launcher (se muestra abajo a la derecha).
-const Version = "1.1.2"
+const Version = "1.1.3"
 
 func main() {
 	limpiarActualizacion()
@@ -35,6 +35,7 @@ func main() {
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 8, G: 9, B: 16, A: 255},
 		AssetServer:      &assetserver.Options{Assets: assets, Handler: graficos},
+		OnShutdown:       app.cerrarJuegos, // cierra los Diablo II que abrió el launcher
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
 			go graficos.precargar()
