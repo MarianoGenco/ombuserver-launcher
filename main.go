@@ -21,10 +21,11 @@ import (
 var assets embed.FS
 
 // Version del launcher (se muestra abajo a la derecha).
-const Version = "1.0.6"
+const Version = "1.0.7"
 
 func main() {
 	limpiarActualizacion()
+	registrarFallasPrueba() // solo con prueba-carga.txt (prueba_carga.go)
 	app := NuevaApp()
 	graficos := nuevosGraficos(app) // figuras del chat: las lee de ombuserver.mpq (graficos.go)
 	err := wails.Run(&options.App{

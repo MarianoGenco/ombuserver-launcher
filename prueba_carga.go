@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,24 @@ func anotarPrueba(formato string, args ...any) {
 	}
 	defer f.Close()
 	fmt.Fprintf(f, "%s  %s\r\n", time.Now().Format("15:04:05"), fmt.Sprintf(formato, args...))
+}
+
+// registrarFallasPrueba: en modo prueba, si el launcher se cae, Go deja el motivo en prueba-carga-error.log.
+func registrarFallasPrueba() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	dir := filepath.Dir(exe)
+	if _, err := os.Stat(filepath.Join(dir, archivoPruebaCarga)); err != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "prueba-carga-error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	fmt.Fprintf(f, "\r\n=== launcher %s abierto a las %s\r\n", Version, time.Now().Format("15:04:05"))
+	debug.SetCrashOutput(f, debug.CrashOptions{})
 }
 
 type cuentaPrueba struct{ cuenta, clave string }

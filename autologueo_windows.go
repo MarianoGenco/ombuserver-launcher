@@ -73,6 +73,11 @@ func escribir(h uintptr, texto string) {
 // autologuear: en la pantalla de Battle.net borra el campo de cuenta, escribe cuenta, Tab, contraseña, Enter; y
 // después Enter para entrar con el primer personaje.
 func autologuear(pid int, c cuentaPrueba, p *pruebaCarga) {
+	defer func() {
+		if r := recover(); r != nil {
+			anotarPrueba("%s: falla en el autologueo: %v", c.cuenta, r)
+		}
+	}()
 	h := ventanaDe(pid)
 	if h == 0 {
 		anotarPrueba("%s: no apareció la ventana del juego (proceso %d) en 90 s", c.cuenta, pid)
