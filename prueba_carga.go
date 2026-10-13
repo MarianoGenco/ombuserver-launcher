@@ -22,8 +22,10 @@ import (
 //	# cuenta clave
 //	carga01 carga2026
 //	carga02 carga2026
-//	espera_login 15        (opcional: segundos desde que aparece la ventana hasta escribir la cuenta)
-//	espera_personaje 8     (opcional: segundos desde el login hasta entrar con el personaje)
+//	espera_cuenta 1        (opcional: segundos desde que aparece la ventana hasta abrir la siguiente: lo que tarda en
+//	                        leer su cuenta recordada; si salen cuentas cambiadas, subirlo)
+//	espera_login 2         (opcional: segundos desde que aparece la ventana hasta escribir la contraseña)
+//	espera_personaje 3     (opcional: segundos desde el login hasta entrar con el personaje)
 
 const archivoPruebaCarga = "prueba-carga.txt"
 
@@ -63,6 +65,7 @@ type cuentaPrueba struct{ cuenta, clave string }
 
 type pruebaCarga struct {
 	cuentas         []cuentaPrueba
+	esperaCuenta    time.Duration
 	esperaLogin     time.Duration
 	esperaPersonaje time.Duration
 }
@@ -78,7 +81,7 @@ func leerPruebaCarga() *pruebaCarga {
 		return nil
 	}
 	defer f.Close()
-	p := &pruebaCarga{esperaLogin: 15 * time.Second, esperaPersonaje: 8 * time.Second}
+	p := &pruebaCarga{esperaCuenta: 1 * time.Second, esperaLogin: 2 * time.Second, esperaPersonaje: 3 * time.Second}
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		campos := strings.Fields(s.Text())
@@ -86,7 +89,9 @@ func leerPruebaCarga() *pruebaCarga {
 			continue
 		}
 		if n, err := strconv.Atoi(campos[1]); err == nil && strings.HasPrefix(campos[0], "espera_") {
-			if campos[0] == "espera_login" {
+			if campos[0] == "espera_cuenta" {
+				p.esperaCuenta = time.Duration(n) * time.Second
+			} else if campos[0] == "espera_login" {
 				p.esperaLogin = time.Duration(n) * time.Second
 			} else if campos[0] == "espera_personaje" {
 				p.esperaPersonaje = time.Duration(n) * time.Second
@@ -102,7 +107,11 @@ func leerPruebaCarga() *pruebaCarga {
 	if len(p.cuentas) > 64 {
 		p.cuentas = p.cuentas[:64]
 	}
-	anotarPrueba("modo prueba: %d cuentas, espera_login %v, espera_personaje %v", len(p.cuentas), p.esperaLogin, p.esperaPersonaje)
+	if p.esperaLogin < p.esperaCuenta {
+		p.esperaLogin = p.esperaCuenta
+	}
+	anotarPrueba("modo prueba: %d cuentas, espera_cuenta %v, espera_login %v, espera_personaje %v", len(p.cuentas),
+		p.esperaCuenta, p.esperaLogin, p.esperaPersonaje)
 	return p
 }
 
@@ -112,8 +121,9 @@ type juegosPrueba struct {
 	procesos []*os.Process
 }
 
-// jugarPrueba abre una ventana por cuenta, de a una: graba su cuenta como recordada, abre el juego, espera la
-// pantalla de login y escribe la contraseña (autologueo_windows.go); al final deja la cuenta recordada que había.
+// jugarPrueba abre una ventana por cuenta: graba su cuenta como recordada, abre el juego y, cuando ya leyó su cuenta
+// (espera_cuenta después de aparecer), pasa a la siguiente; cada una escribe su contraseña en paralelo
+// (autologueo_windows.go). Al final deja la cuenta recordada que había.
 func (a *App) jugarPrueba(cfg Config, banderas []string, p *pruebaCarga) error {
 	anterior, habia := cuentaRecordada()
 	defer recordarCuenta(anterior, habia)
@@ -128,9 +138,17 @@ func (a *App) jugarPrueba(cfg Config, banderas []string, p *pruebaCarga) error {
 		a.prueba.mu.Lock()
 		a.prueba.procesos = append(a.prueba.procesos, cmd.Process)
 		a.prueba.mu.Unlock()
-		if h := loguearVentana(cmd.Process.Pid, c, p); h != 0 {
-			go entrarPersonaje(h, c, p.esperaPersonaje)
+		h := esperarVentana(cmd.Process.Pid, c)
+		if h == 0 {
+			continue
 		}
+		time.Sleep(p.esperaCuenta)
+		go func(h uintptr, c cuentaPrueba) {
+			time.Sleep(p.esperaLogin - p.esperaCuenta)
+			if escribirClave(h, c) {
+				entrarPersonaje(h, c, p.esperaPersonaje)
+			}
+		}(h, c)
 	}
 	anotarPrueba("listo: %d ventanas", len(p.cuentas))
 	return nil

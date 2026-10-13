@@ -18,8 +18,8 @@ import (
 //   - el Tab mandado desde afuera no cambia de campo (ni como tecla ni como carácter);
 //   - al armar la pantalla de login, el juego lee la cuenta recordada ("Last BNet" en HKCU\...\Diablo II; Game.exe
 //     0x430920): si hay una, la escribe y pone el cursor en la contraseña.
-// Por eso, por cada ventana: se graba su cuenta como recordada, se abre el juego, se espera la pantalla de login y se
-// escribe solo la contraseña. Recién entonces se pasa a la siguiente (si no, se pisarían la cuenta recordada).
+// Por eso, por cada ventana: se graba su cuenta como recordada, se abre el juego y, cuando ya armó el login (leyó su
+// cuenta), se pasa a la siguiente; la contraseña la escribe cada una en paralelo.
 
 var (
 	user32                 = windows.NewLazySystemDLL("user32.dll")
@@ -114,19 +114,22 @@ func recordarCuenta(cuenta string, hay bool) {
 	}
 }
 
-// loguearVentana: con la cuenta ya recordada, espera la pantalla de login del proceso y escribe la contraseña.
-// Devuelve la ventana (0 si no apareció) para entrar después con el personaje.
-func loguearVentana(pid int, c cuentaPrueba, p *pruebaCarga) uintptr {
+// esperarVentana: la ventana visible del juego (aparece cuando ya se conectó a Battle.net y arma el login).
+func esperarVentana(pid int, c cuentaPrueba) uintptr {
 	h := ventanaDe(pid)
 	if h == 0 {
 		anotarPrueba("%s: no apareció la ventana del juego (proceso %d) en 90 s", c.cuenta, pid)
-		return 0
+	} else {
+		anotarPrueba("%s: ventana %#x del proceso %d", c.cuenta, h, pid)
 	}
-	anotarPrueba("%s: ventana %#x del proceso %d; escribe la contraseña en %v", c.cuenta, h, pid, p.esperaLogin)
-	time.Sleep(p.esperaLogin)
+	return h
+}
+
+// escribirClave: la cuenta ya está puesta (recordada): borra el campo de la contraseña, la escribe y da Enter.
+func escribirClave(h uintptr, c cuentaPrueba) bool {
 	if v, _, _ := isWindowVisible.Call(h); v == 0 {
 		anotarPrueba("%s: la ventana ya no está (¿se cerró el juego?)", c.cuenta)
-		return 0
+		return false
 	}
 	activar(h)
 	for i := 0; i < 16; i++ {
@@ -135,7 +138,7 @@ func loguearVentana(pid int, c cuentaPrueba, p *pruebaCarga) uintptr {
 	escribir(h, c.clave)
 	tecla(h, vkReturn)
 	anotarPrueba("%s: contraseña escrita y Enter", c.cuenta)
-	return h
+	return true
 }
 
 // entrarPersonaje: Enter en la elección de personaje (entra con el primero).
