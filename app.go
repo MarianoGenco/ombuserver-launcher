@@ -327,9 +327,9 @@ func (a *App) actualizarJuego(cfg Config) error {
 			return sinConexion(err)
 		}
 	}
-	a.avisar("Revisando el contenido del Mundo 6…", -1)
+	a.avisar("Buscando actualizaciones…", -1)
 	datos := ombu.CarpetaDatos(cfg.Carpeta, "")
-	if _, err := a.cliente.SincronizarMPQ(datos, a.barra("Bajando el contenido del Mundo 6…")); err != nil {
+	if _, err := a.cliente.SincronizarMPQ(datos, a.barra("Bajando actualización…")); err != nil {
 		return sinConexion(err)
 	}
 	return nil

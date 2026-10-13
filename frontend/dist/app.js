@@ -661,7 +661,7 @@ function simulacion() {
       ? { version: "1.0.4", config: { ...cfg }, juegoOk: true, pendiente: true, accion: "actualizar", aviso: "pendiente", mensaje: "Hay una actualización de OmbuServer." }
       : { version: "1.0.4", config: { ...cfg }, juegoOk: true, pendiente: false, accion: "jugar", aviso: "ok", mensaje: "El juego está al día." }),
     Actualizar: async () => {
-      for (let i = 0; i <= 100; i += 20) { alProgreso({ texto: "Bajando el contenido del Mundo 6…", porcentaje: i }); await espera(150); }
+      for (let i = 0; i <= 100; i += 20) { alProgreso({ texto: "Bajando actualización…", porcentaje: i }); await espera(150); }
       simPendiente = false;
       return false;
     },
@@ -718,7 +718,7 @@ function simulacion() {
     AbrirCarpeta: () => {},
     Info: async () => ({ version: "1.0.4", servidor: "OmbuServer", carpetaDatos: "C:\\Users\\Mariano\\AppData\\Local\\OmbuServer" }),
     Jugar: async () => {
-      for (let i = 0; i <= 100; i += 10) { alProgreso({ texto: "Bajando el contenido del Mundo 6…", porcentaje: i }); await espera(120); }
+      for (let i = 0; i <= 100; i += 10) { alProgreso({ texto: "Bajando actualización…", porcentaje: i }); await espera(120); }
       alProgreso({ texto: "Abriendo Diablo II…", porcentaje: -1 });
       await espera(600);
     },
