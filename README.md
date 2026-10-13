@@ -8,7 +8,7 @@ configuración de ventanas) y su idea de funcionamiento. El código está reescr
 therecipe/qt (sin mantenimiento desde 2020); este usa [Wails](https://wails.io) (Go + WebView2) y está adaptado a
 Diablo II 1.14b y a OmbuServer.
 
-![Launcher](docs/launcher.png)
+![Inicio del launcher](docs/inicio.jpg)
 
 ## Qué hace
 
@@ -24,6 +24,17 @@ Diablo II 1.14b y a OmbuServer.
 - **Voz** en los canales privados ([LiveKit](https://livekit.io)): tecla para hablar que anda aunque el juego tenga el
   foco, o detección de voz; mutear para uno o, el operador del canal, para todos.
 - **Español o inglés** (Configuración → Acerca de), y Battle.net contesta en el mismo idioma.
+
+## Capturas
+
+| | |
+|---|---|
+| ![Chat de Battle.net](docs/chat.jpg) | ![Clic derecho sobre un personaje](docs/chat-menu.jpg) |
+| **Chat de Battle.net**: los personajes del canal, susurrar y lo último escrito con las flechas. | **Clic derecho sobre un personaje**: susurrar, ignorar (con la cruz roja del juego) y, en la voz, mutear. |
+| ![Voz](docs/voz.jpg) | ![Al jugar](docs/opciones.jpg) |
+| **Voz** en los canales privados: tecla para hablar o detección de voz, y prueba del micrófono. | **Al jugar**: varias ventanas, modo ventana, 1200×900 nítido e idioma del juego. |
+| ![Launcher en inglés](docs/acerca-en.jpg) | |
+| **English**: el launcher también en inglés (Configuración → Acerca de). | |
 
 No pide permisos de administrador. Sus datos van en `%LOCALAPPDATA%\OmbuServer`.
 
@@ -59,6 +70,8 @@ wails build -platform windows/amd64 -trimpath -ldflags "-s -w \
 | `app.go`, `instalar.go`, `actualizar.go` | Lo que usa la ventana: estado, jugar, instalar el juego, actualizar el launcher |
 | `chat/`, `chat_app.go` | Cliente de chat de Battle.net (protocolo BNCS) y la sesión del chat |
 | `voz.go` | Permiso para la sala de voz (lo da el servidor) y la tecla para hablar |
+| `graficos.go`, `ombu/mpq.go` | Las figuras del chat: se leen de `ombuserver.mpq` (lector de MPQ propio) |
+| `.github/workflows/compilar.yml` | Compila `OmbuServer.exe` en GitHub Actions |
 | `frontend/dist/` | La ventana (HTML, CSS y JavaScript). Abriendo `index.html` en un navegador se ve con datos de ejemplo (`?chat&sesion` para el chat) |
 | `frontend/dist/voz.js`, `i18n.js` | La voz del chat y la traducción al inglés |
 | `frontend/dist/vendor/` | [livekit-client](https://github.com/livekit/client-sdk-js) 2.22.3 (Apache 2.0), sin cambios |
@@ -80,7 +93,7 @@ or the person installing or operating it (it only talks to OmbuServer's own serv
 
 MIT (ver `LICENSE`). El diseño está basado en [slashdiablo-launcher](https://github.com/nokka/slashdiablo-launcher)
 (MIT, © 2019 Stefan Konno). Fuentes Cinzel y Roboto con sus licencias libres (`frontend/dist/fuentes/`).
-livekit-client: Apache 2.0, © LiveKit, Inc. Las figuras del chat (`frontend/dist/img/chat/`) salen de los archivos de
-Diablo II y no están en el repo: se generan desde una instalación del juego.
+livekit-client: Apache 2.0, © LiveKit, Inc. Las figuras del chat salen de los archivos de Diablo II y no están en el
+repo: viajan adentro de `ombuserver.mpq`, que el launcher baja del servidor.
 
 Diablo II es una marca de Blizzard Entertainment. Este proyecto no está afiliado a Blizzard.

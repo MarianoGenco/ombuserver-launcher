@@ -658,14 +658,14 @@ function simulacion() {
   let simPendiente = true;
   return {
     Estado: async () => (simPendiente
-      ? { version: "1.0.1", config: { ...cfg }, juegoOk: true, pendiente: true, accion: "actualizar", aviso: "pendiente", mensaje: "Hay una actualización de OmbuServer." }
-      : { version: "1.0.1", config: { ...cfg }, juegoOk: true, pendiente: false, accion: "jugar", aviso: "ok", mensaje: "El juego está al día." }),
+      ? { version: "1.0.4", config: { ...cfg }, juegoOk: true, pendiente: true, accion: "actualizar", aviso: "pendiente", mensaje: "Hay una actualización de OmbuServer." }
+      : { version: "1.0.4", config: { ...cfg }, juegoOk: true, pendiente: false, accion: "jugar", aviso: "ok", mensaje: "El juego está al día." }),
     Actualizar: async () => {
       for (let i = 0; i <= 100; i += 20) { alProgreso({ texto: "Bajando el contenido del Mundo 6…", porcentaje: i }); await espera(150); }
       simPendiente = false;
       return false;
     },
-    ElegirCarpeta: async () => ({ version: "1.0.1", config: { ...cfg }, juegoOk: true, aviso: "ok", mensaje: "El juego está al día." }),
+    ElegirCarpeta: async () => ({ version: "1.0.4", config: { ...cfg }, juegoOk: true, aviso: "ok", mensaje: "El juego está al día." }),
     GuardarOpciones: async (v, d, w, s, i, e) => Object.assign(cfg, { ventanas: v, demora: d, ventana: w, sonido: s, idioma: i, escala: e }),
     GuardarVoz: async (m, t, n, s) => Object.assign(cfg, { vozModo: m, vozTecla: t, vozTeclaNombre: n, vozSensibilidad: s }),
     VozPermiso: async () => { throw new Error("la voz solo anda en el launcher"); },
@@ -716,7 +716,7 @@ function simulacion() {
       return { conectado: true, usuario: cuenta, recordado: cuenta };
     },
     AbrirCarpeta: () => {},
-    Info: async () => ({ version: "1.0.1", servidor: "OmbuServer", carpetaDatos: "C:\\Users\\Mariano\\AppData\\Local\\OmbuServer" }),
+    Info: async () => ({ version: "1.0.4", servidor: "OmbuServer", carpetaDatos: "C:\\Users\\Mariano\\AppData\\Local\\OmbuServer" }),
     Jugar: async () => {
       for (let i = 0; i <= 100; i += 10) { alProgreso({ texto: "Bajando el contenido del Mundo 6…", porcentaje: i }); await espera(120); }
       alProgreso({ texto: "Abriendo Diablo II…", porcentaje: -1 });
