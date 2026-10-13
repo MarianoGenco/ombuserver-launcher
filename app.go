@@ -338,9 +338,14 @@ func (a *App) Jugar() error {
 		banderas = append(banderas, "-ns")
 	}
 	a.antesDeJugar()
-	for i := 0; i < cfg.Ventanas; i++ {
-		if cfg.Ventanas > 1 {
-			a.avisar(fmt.Sprintf("Abriendo Diablo II (%d de %d)…", i+1, cfg.Ventanas), -1)
+	ventanas := cfg.Ventanas
+	prueba := leerPruebaCarga() // modo de prueba de carga (prueba_carga.go): una ventana por cuenta, con autologueo
+	if prueba != nil {
+		ventanas = len(prueba.cuentas)
+	}
+	for i := 0; i < ventanas; i++ {
+		if ventanas > 1 {
+			a.avisar(fmt.Sprintf("Abriendo Diablo II (%d de %d)…", i+1, ventanas), -1)
 		} else {
 			a.avisar("Abriendo Diablo II…", -1)
 		}
@@ -349,7 +354,10 @@ func (a *App) Jugar() error {
 			return fmt.Errorf("no se pudo abrir Game.exe: %v", err)
 		}
 		a.vigilarJuego(cmd)
-		if i < cfg.Ventanas-1 {
+		if prueba != nil {
+			go autologuear(cmd.Process.Pid, prueba.cuentas[i], prueba)
+		}
+		if i < ventanas-1 {
 			time.Sleep(time.Duration(cfg.Demora) * time.Second)
 		}
 	}

@@ -21,7 +21,7 @@ import (
 var assets embed.FS
 
 // Version del launcher (se muestra abajo a la derecha).
-const Version = "1.0.4"
+const Version = "1.0.5"
 
 func main() {
 	limpiarActualizacion()
