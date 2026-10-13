@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 
@@ -20,13 +21,12 @@ import (
 var assets embed.FS
 
 // Version del launcher (se muestra abajo a la derecha).
-const Version = "1.0.3"
+const Version = "1.0.4"
 
 func main() {
 	limpiarActualizacion()
 	app := NuevaApp()
-	graficos := nuevosGraficos() // figuras del chat: las baja del servidor (graficos.go)
-	go graficos.precargar()
+	graficos := nuevosGraficos(app) // figuras del chat: las lee de ombuserver.mpq (graficos.go)
 	err := wails.Run(&options.App{
 		Title:            "OmbuServer",
 		Width:            1024,
@@ -35,8 +35,11 @@ func main() {
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 8, G: 9, B: 16, A: 255},
 		AssetServer:      &assetserver.Options{Assets: assets, Handler: graficos},
-		OnStartup:        app.startup,
-		Bind:             []interface{}{app},
+		OnStartup: func(ctx context.Context) {
+			app.startup(ctx)
+			go graficos.precargar()
+		},
+		Bind: []interface{}{app},
 		// Un solo launcher abierto: si lo abren de nuevo, se trae al frente el que ya está.
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId:               "ombuserver-launcher-5f3c2a",

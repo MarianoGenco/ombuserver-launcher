@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -129,6 +130,8 @@ func (c *Cliente) VersionRemotaMPQ() (string, error) {
 // de lo bajado antes de reemplazar, y si el MPQ está abierto por el juego no lo pisa a medias.
 // Devuelve si cambió algo.
 func (c *Cliente) SincronizarMPQ(carpetaDatos string, p Progreso) (bool, error) {
+	mpqMu.Lock() // JUGAR y el chat (figuras) pueden pedirlo a la vez: uno solo baja
+	defer mpqMu.Unlock()
 	remota, err := c.VersionRemotaMPQ()
 	if err != nil {
 		return false, err
@@ -156,6 +159,8 @@ func (c *Cliente) SincronizarMPQ(carpetaDatos string, p Progreso) (bool, error) 
 	}
 	return true, nil
 }
+
+var mpqMu sync.Mutex
 
 // ArchivoManifiesto es una fila del manifiesto (formato del launcher de Slash).
 type ArchivoManifiesto struct {

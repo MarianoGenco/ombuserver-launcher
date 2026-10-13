@@ -2,13 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -19,130 +13,86 @@ import (
 )
 
 // Figuras del chat (img/chat/*.png): personajes, rangos, la cruz del ignorado, las flechas y el pasto del lobby. Salen
-// de los archivos de Diablo II, así que no van en el repo ni dentro del .exe: las publica el servidor web en
-// contenido/chat/ junto con manifiesto.json (nombre -> sha256), y el launcher las baja, verifica y guarda en
-// %LOCALAPPDATA%\OmbuServer Launcher\chat. La ventana las pide como siempre: Wails llama a este manejador con todo lo
-// que no está adentro del .exe.
+// de los archivos de Diablo II, así que no van en el repo ni dentro del .exe: viajan adentro de ombuserver.mpq
+// (data\ombu\launcher\chat\, cifradas como el resto), el mismo que el launcher ya baja y mantiene al día. La ventana
+// las pide como siempre: Wails llama a este manejador con todo lo que no está adentro del .exe.
 
-const prefijoGraficos = "/img/chat/"
+const (
+	prefijoGraficos = "/img/chat/"
+	carpetaEnMPQ    = `data\ombu\launcher\chat\`
+)
 
 var nombreGrafico = regexp.MustCompile(`^[a-z0-9@-]{1,64}\.png$`)
 
 type graficosChat struct {
-	mu         sync.Mutex
-	manifiesto map[string]string // nombre -> sha256 (se baja una vez por sesión)
-	hasta      time.Time         // si el manifiesto no se pudo bajar, no reintentar antes de esto
-	cli        *http.Client
+	app *App
+
+	mu        sync.Mutex
+	cache     map[string][]byte // lo ya leído del MPQ en esta sesión
+	sincroDel time.Time         // último intento de bajar el MPQ (para no reintentar a cada imagen)
 }
 
-func nuevosGraficos() *graficosChat {
-	return &graficosChat{cli: &http.Client{Timeout: 30 * time.Second}}
+func nuevosGraficos(app *App) *graficosChat {
+	return &graficosChat{app: app, cache: map[string][]byte{}}
 }
 
-func carpetaGraficos() string {
-	d, err := os.UserCacheDir() // en Windows, %LOCALAPPDATA%
+func (g *graficosChat) carpetaDatos() string {
+	g.app.mu.Lock()
+	carpeta := g.app.cfg.Carpeta
+	g.app.mu.Unlock()
+	return ombu.CarpetaDatos(carpeta, "")
+}
+
+// leerDelMPQ abre el MPQ, saca la figura y lo cierra enseguida (abierto trabaría su actualización).
+func (g *graficosChat) leerDelMPQ(nombre string) ([]byte, error) {
+	m, err := ombu.AbrirMPQ(filepath.Join(g.carpetaDatos(), ombu.ArchivoMPQ))
 	if err != nil {
-		d = os.TempDir()
+		return nil, err
 	}
-	return filepath.Join(d, "OmbuServer Launcher", "chat")
+	defer m.Cerrar()
+	return m.Leer(carpetaEnMPQ + nombre)
 }
 
-func (g *graficosChat) leerManifiesto() (map[string]string, error) {
+// sincronizar baja el MPQ publicado si el que hay no está o es otro (a lo sumo una vez por minuto).
+func (g *graficosChat) sincronizar() {
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.manifiesto != nil {
-		return g.manifiesto, nil
+	if time.Since(g.sincroDel) < time.Minute {
+		g.mu.Unlock()
+		return
 	}
-	if time.Now().Before(g.hasta) {
-		return nil, errors.New("sin manifiesto de gráficos")
+	g.sincroDel = time.Now()
+	g.mu.Unlock()
+	if cambio, err := g.app.cliente.SincronizarMPQ(g.carpetaDatos(), nil); err == nil && cambio {
+		g.mu.Lock()
+		g.cache = map[string][]byte{}
+		g.mu.Unlock()
 	}
-	m, err := g.bajarManifiesto()
-	if err != nil {
-		g.hasta = time.Now().Add(30 * time.Second)
-		return nil, err
-	}
-	g.manifiesto = m
-	return m, nil
 }
 
-func (g *graficosChat) bajarManifiesto() (map[string]string, error) {
-	b, err := g.bajar("manifiesto.json", 64<<10)
-	if err != nil {
-		return nil, err
-	}
-	var m map[string]string
-	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (g *graficosChat) bajar(nombre string, tope int64) ([]byte, error) {
-	r, err := g.cli.Get(ombu.URLContenido + "chat/" + nombre)
-	if err != nil {
-		return nil, err
-	}
-	defer r.Body.Close()
-	if r.StatusCode != http.StatusOK {
-		return nil, errors.New("estado " + r.Status)
-	}
-	return io.ReadAll(io.LimitReader(r.Body, tope))
-}
-
-func sha256Hex(b []byte) string {
-	s := sha256.Sum256(b)
-	return hex.EncodeToString(s[:])
-}
-
-// grafico devuelve el PNG: el guardado si coincide con el manifiesto; si no, lo baja, lo verifica y lo guarda.
-// Sin conexión, usa el guardado aunque no se pueda comparar.
 func (g *graficosChat) grafico(nombre string) ([]byte, error) {
-	ruta := filepath.Join(carpetaGraficos(), nombre)
-	guardado, errLocal := os.ReadFile(ruta)
-	m, err := g.leerManifiesto()
-	if err != nil {
-		if errLocal == nil {
-			return guardado, nil
-		}
-		return nil, err
+	g.mu.Lock()
+	b, ok := g.cache[nombre]
+	g.mu.Unlock()
+	if ok {
+		return b, nil
 	}
-	esperado, ok := m[nombre]
-	if !ok {
-		return nil, os.ErrNotExist
-	}
-	if errLocal == nil && sha256Hex(guardado) == esperado {
-		return guardado, nil
-	}
-	b, err := g.bajar(nombre, 4<<20)
-	if err != nil {
-		if errLocal == nil {
-			return guardado, nil
-		}
-		return nil, err
-	}
-	if sha256Hex(b) != esperado {
-		return nil, errors.New(nombre + ": no coincide con el manifiesto")
-	}
-	if os.MkdirAll(filepath.Dir(ruta), 0755) == nil {
-		tmp := ruta + ".tmp"
-		if os.WriteFile(tmp, b, 0644) == nil {
-			os.Rename(tmp, ruta)
+	b, err := g.leerDelMPQ(nombre)
+	if err != nil { // sin MPQ, o uno anterior a las figuras: se baja el publicado y se reintenta
+		g.sincronizar()
+		if b, err = g.leerDelMPQ(nombre); err != nil {
+			return nil, err
 		}
 	}
+	g.mu.Lock()
+	g.cache[nombre] = b
+	g.mu.Unlock()
 	return b, nil
 }
 
-// precargar baja en segundo plano todas las figuras, para que el chat las tenga al abrirlo.
+// precargar: al abrir el launcher, si el MPQ no tiene las figuras, lo baja en segundo plano para que el chat las
+// tenga al abrirlo.
 func (g *graficosChat) precargar() {
-	m, err := g.leerManifiesto()
-	if err != nil {
-		return
-	}
-	for nombre := range m {
-		if nombreGrafico.MatchString(nombre) {
-			g.grafico(nombre)
-		}
-	}
+	g.grafico("pasto.png")
 }
 
 func (g *graficosChat) ServeHTTP(w http.ResponseWriter, r *http.Request) {
