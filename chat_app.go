@@ -155,6 +155,7 @@ func (a *App) ChatSalir() {
 	}
 	s.cli, s.usuario, s.clave, s.pausado, s.conectando = nil, "", "", false, false
 	s.mu.Unlock()
+	a.olvidarMensajes()
 	if cuenta, _, ok := leerCredenciales(); ok {
 		guardarSoloCuenta(cuenta)
 	}

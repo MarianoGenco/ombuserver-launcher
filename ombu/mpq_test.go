@@ -40,3 +40,29 @@ func TestLeerMPQ(t *testing.T) {
 	}
 	t.Logf("%d figuras comparadas", len(nombres))
 }
+
+// Con OMBU_MPQ_ORIGINAL (un d2data.mpq del juego) y OMBU_MPQ_ORIGINAL_DIR (carpeta con archivos sacados de ese MPQ
+// con StormLib, con el nombre interno y "\" cambiada por "__"), compara lo que lee este lector (PKWARE).
+func TestLeerMPQOriginal(t *testing.T) {
+	ruta, dir := os.Getenv("OMBU_MPQ_ORIGINAL"), os.Getenv("OMBU_MPQ_ORIGINAL_DIR")
+	if ruta == "" || dir == "" {
+		t.Skip("sin OMBU_MPQ_ORIGINAL / OMBU_MPQ_ORIGINAL_DIR")
+	}
+	m, err := AbrirMPQ(ruta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Cerrar()
+	nombres, _ := filepath.Glob(filepath.Join(dir, "*"))
+	if len(nombres) == 0 {
+		t.Fatal("carpeta vacía")
+	}
+	for _, n := range nombres {
+		want, _ := os.ReadFile(n)
+		interno := string(bytes.ReplaceAll([]byte(filepath.Base(n)), []byte("__"), []byte(`\`)))
+		got, err := m.Leer(interno)
+		if err != nil || !bytes.Equal(got, want) {
+			t.Errorf("%s: %v (leídos %d, esperados %d)", interno, err, len(got), len(want))
+		}
+	}
+}

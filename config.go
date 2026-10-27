@@ -17,7 +17,8 @@ type Config struct {
 	Ventana  bool   `json:"ventana"`  // modo ventana (-w): el banner del lobby lo necesita
 	Sonido   bool   `json:"sonido"`   // false = -ns (sin sonido)
 	Idioma   int    `json:"idioma"`   // idioma del juego: 0 inglés, 1 español (lo aplica la DLL, mod_mpq.cpp)
-	Escala   int    `json:"escala"`   // tamaño de ventana: 100 (800×600) o 150 (1200×900); mod_ventana.cpp
+	Escala   int    `json:"escala"`   // tamaño de ventana: 100 (800×600, vista normal) o 150 (1200×900, vista alejada)
+	Vista    int    `json:"vista"`    // 0 normal, 1 alejada (la partida a 1200×900, se ve más mapa); mod_vista.cpp
 
 	// Voz del chat (voz.go): cómo se habla en la sala de voz de un canal privado.
 	VozModo         int    `json:"vozModo"`         // 0 tecla para hablar, 1 detección de voz
@@ -67,6 +68,12 @@ func normalizar(c Config) Config {
 	}
 	if c.Escala != 150 {
 		c.Escala = 100
+	}
+	// 1200×900 es la vista alejada y 800×600 la normal (una sola opción en el launcher, 2026-10-14)
+	if c.Escala == 150 {
+		c.Vista = 1
+	} else {
+		c.Vista = 0
 	}
 	if c.VozModo != 1 {
 		c.VozModo = 0

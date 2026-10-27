@@ -11,7 +11,8 @@
   <header class="barra" style="--wails-draggable:drag">
     <nav class="menu">
       <button class="menu-item activo" data-vista="inicio">Inicio</button>
-      <button class="menu-item" data-vista="chat">Chat</button>
+      <button class="menu-item" data-vista="chat">Chat<span class="menu-globo" id="menu-mensajes" hidden></span></button>
+      <button class="menu-item" data-vista="trades">Trades</button>
       <button class="menu-item" data-vista="opciones">Configuración</button>
     </nav>
     <div class="controles">
@@ -38,9 +39,10 @@
             <span class="carpeta-etiqueta">Carpeta del juego</span>
             <span class="carpeta-ruta" id="carpeta-ruta">Elegir…</span>
           </button>
-          <button class="jugar" id="jugar" disabled>
+          <button class="jugar cargando" id="jugar" disabled>
             <span class="jugar-relleno" id="jugar-relleno"></span>
-            <span class="jugar-texto" id="jugar-texto">Jugar</span>
+            <span class="jugar-cargando" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="jugar-texto" id="jugar-texto"></span>
           </button>
         </div>
       </div>
@@ -64,7 +66,6 @@
 
     <div class="opciones-cuerpo">
       <div class="grupo" data-seccion="juego">
-        <h2 class="grupo-titulo">Juego</h2>
         <div class="campo">
           <span class="campo-nombre">Carpeta de Diablo II</span>
           <span class="campo-ayuda">La carpeta donde está Game.exe (Diablo II: Lord of Destruction 1.14b).</span>
@@ -78,7 +79,6 @@
       </div>
 
       <div class="grupo" data-seccion="jugar" hidden>
-        <h2 class="grupo-titulo">Al jugar</h2>
         <div class="campo fila-campo">
           <div>
             <span class="campo-nombre">Ventanas de Diablo II</span>
@@ -123,7 +123,7 @@
         <div class="campo fila-campo" id="campo-escala">
           <div>
             <span class="campo-nombre">Tamaño de ventana</span>
-            <span class="campo-ayuda">El juego se ve igual para todos, solo más grande.</span>
+            <span class="campo-ayuda">1200×900: se ve más lejos y entra más mapa.</span>
           </div>
           <div class="segmentos" id="op-escala">
             <button data-escala="100">800×600</button><button data-escala="150">1200×900</button>
@@ -132,7 +132,6 @@
       </div>
 
       <div class="grupo" data-seccion="voz" hidden>
-        <h2 class="grupo-titulo">Voz</h2>
         <p class="nota voz-nota">La voz anda en los canales privados: creá uno con <b>/join nombre</b> y tus amigos entran con el mismo comando.</p>
         <div class="campo fila-campo">
           <div>
@@ -164,7 +163,6 @@
       </div>
 
       <div class="grupo" data-seccion="acerca" hidden>
-        <h2 class="grupo-titulo">Acerca de</h2>
         <div class="campo fila-campo">
           <div>
             <span class="campo-nombre">Idioma del launcher</span>
@@ -208,6 +206,9 @@
 
     <!-- Con sesión: el chat -->
     <div class="chat-sala" id="chat-sala" hidden>
+      <!-- arriba: el chat (o una conversación privada) y al costado la columna de mensajes; abajo, la tira -->
+      <div class="sala-arriba">
+      <div class="sala-centro">
       <div class="sala-cabecera">
         <button class="sala-canal" id="sala-canal" title="Cambiar de canal"><span id="sala-canal-nombre" translate="no">OmbuServer</span> (<span id="sala-cantidad">0</span>)</button>
         <form class="sala-unirse" id="sala-unirse" hidden>
@@ -215,9 +216,13 @@
           <button type="submit" class="boton">Entrar</button>
         </form>
         <span class="sala-aviso" id="sala-aviso"></span>
+        <!-- conversación privada (mensajes.js): volver al canal y con quién se habla -->
+        <button class="priv-volver" id="priv-volver" hidden title="Volver al canal">‹ Canal</button>
+        <p class="priv-titulo" id="priv-titulo" hidden><span class="trades-punto" id="priv-punto"></span><span class="priv-con">Conversación con</span> <span class="priv-nombre" id="priv-nombre" translate="no"></span></p>
         <button class="sala-salir" id="sala-salir" title="Cerrar la sesión del chat">Salir</button>
       </div>
       <div class="sala-mensajes" id="sala-mensajes"></div>
+      <div class="sala-mensajes priv-mensajes" id="priv-mensajes" hidden></div>
       <form class="sala-escribir" id="sala-escribir" autocomplete="off">
         <input id="sala-texto" maxlength="220" spellcheck="false" placeholder="Escribí un mensaje…">
         <button type="button" class="voz-mic" id="voz-mic" hidden title="Entrar a la voz del canal">
@@ -225,6 +230,13 @@
           <span class="voz-raya"></span><span class="voz-cuantos" id="voz-cuantos"></span>
         </button>
       </form>
+      </div>
+      <!-- columna de mensajes de la cuenta (mensajes.js) -->
+      <aside class="buzon" id="buzon">
+        <div class="buzon-cabecera"><span class="buzon-titulo">Trades</span><span class="buzon-cuantos" id="buzon-cuantos" hidden></span></div>
+        <div class="buzon-lista" id="buzon-lista"></div>
+      </aside>
+      </div>
       <div class="voz-panel" id="voz-panel" hidden>
         <div class="voz-panel-estado" id="voz-estado"></div>
         <button id="voz-silenciar">Silenciar micrófono</button>
@@ -244,11 +256,87 @@
     </div>
   </section>
 
+  <!-- TRADES: los ítems que los jugadores dejan en la página de trade del alijo (trades.js) -->
+  <section class="vista-trades" id="trades" hidden>
+    <nav class="trades-filtros" id="trades-filtros">
+      <button class="trades-cat activa" data-cat="">Todos</button>
+      <button class="trades-cat" data-cat="cascos">Cascos</button>
+      <button class="trades-cat" data-cat="armaduras">Armaduras</button>
+      <button class="trades-cat" data-cat="armas">Armas</button>
+      <button class="trades-cat" data-cat="escudos">Escudos</button>
+      <button class="trades-cat" data-cat="guantes">Guantes</button>
+      <button class="trades-cat" data-cat="botas">Botas</button>
+      <button class="trades-cat" data-cat="cintos">Cintos</button>
+      <button class="trades-cat" data-cat="anillos">Anillos</button>
+      <button class="trades-cat" data-cat="amuletos">Amuletos</button>
+      <button class="trades-cat" data-cat="gemas">Gemas</button>
+      <button class="trades-cat" data-cat="runas">Runas</button>
+      <button class="trades-cat" data-cat="hechizos">Hechizos</button>
+      <button class="trades-cat" data-cat="joyas">Joyas</button>
+      <button class="trades-cat" data-cat="otros">Otros</button>
+    </nav>
+    <div class="trades-cuerpo">
+      <div class="trades-barra">
+        <div class="trades-buscador">
+          <input class="trades-buscar" id="trades-buscar" type="text" maxlength="60" placeholder="Buscar por nombre, propiedad o jugador…" spellcheck="false">
+          <!-- filtro por calidad: desplegable propio (no el <select> de Windows), trades.js -->
+          <div class="desplegable" id="trades-calidad">
+            <button type="button" class="desplegable-boton" id="trades-calidad-boton" aria-haspopup="listbox" aria-expanded="false" title="Filtrar por calidad">
+              <span class="desplegable-punto" id="trades-calidad-punto"></span><span class="desplegable-texto" id="trades-calidad-texto">Calidad</span>
+              <svg class="desplegable-flecha" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
+            </button>
+            <div class="desplegable-lista" id="trades-calidad-lista" role="listbox" hidden></div>
+          </div>
+        </div>
+        <span class="trades-total" id="trades-total"></span>
+        <button class="trades-pag trades-refrescar" id="trades-refrescar" title="Actualizar"><span class="trades-giro">↻</span></button>
+        <div class="trades-paginas">
+          <button class="trades-pag" id="trades-ant" title="Página anterior">‹</button>
+          <span id="trades-pagina"></span>
+          <button class="trades-pag" id="trades-sig" title="Página siguiente">›</button>
+        </div>
+      </div>
+      <div class="trades-grilla" id="trades-grilla"></div>
+      <p class="trades-vacio" id="trades-vacio" hidden></p>
+    </div>
+    <div class="trades-tip" id="trades-tip" hidden></div>
+  </section>
+
+  <!-- Mensaje al dueño de un ítem de TRADES (mensajes.js) -->
+  <div class="modal-fondo" id="msj-modal" hidden>
+    <form class="modal" id="msj-modal-form" autocomplete="off">
+      <button type="button" class="modal-cerrar" id="msj-modal-cerrar" title="Cerrar">
+        <svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+      </button>
+      <h2 class="modal-titulo">Mensaje al dueño</h2>
+      <div class="modal-item">
+        <div class="modal-item-img" id="msj-modal-img"></div>
+        <div class="modal-item-datos">
+          <p class="modal-item-nombre" id="msj-modal-nombre" translate="no"></p>
+          <p class="modal-item-dueno"><span class="trades-punto" id="msj-modal-punto"></span><span id="msj-modal-dueno" translate="no"></span><span class="modal-item-pj" id="msj-modal-pj" translate="no"></span></p>
+        </div>
+      </div>
+      <label class="modal-campo">
+        <span>Tu mensaje</span>
+        <textarea id="msj-modal-texto" maxlength="500" spellcheck="false" rows="4"></textarea>
+        <span class="modal-largo" id="msj-modal-largo">0 / 500</span>
+      </label>
+      <p class="modal-nota" id="msj-modal-nota"></p>
+      <div class="modal-botones">
+        <button type="button" class="boton" id="msj-modal-cancelar">Cancelar</button>
+        <button type="submit" class="boton primario" id="msj-modal-enviar">Enviar</button>
+      </div>
+    </form>
+  </div>
+
   <div class="menu-persona" id="menu-persona" hidden></div>
   <div id="voz-audio" hidden></div>
   <script src="vendor/livekit-client.umd.js"></script>
   <script src="i18n.js"></script>
   <script src="app.js"></script>
   <script src="voz.js"></script>
+  <script src="trades.js"></script>
+  <script src="mensajes.js"></script>
+  <script src="cursor.js"></script>
 </body>
 </html>

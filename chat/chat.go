@@ -3,8 +3,8 @@
 //
 // Es el mismo handshake que ya usa el panel de admin (ombuserver-panel/chat.js), probado contra nuestro bnetd:
 // 0x01 (protocolo BNCS) → SID_AUTH_INFO (0x50) → SID_AUTH_CHECK (0x51) → SID_LOGONRESPONSE2 (0x3A) → SID_ENTERCHAT
-// (0x0A) → SID_JOINCHANNEL (0x0C). Se presenta como Diablo II LoD 1.14b con la versión 1.14.1.1 (la que manda la
-// DLL de OmbuServer, mod_lanzador.cpp), así pasa el versioncheck del servidor aunque deje de aceptar la 1.14.1.0.
+// (0x0A) → SID_JOINCHANNEL (0x0C). Se presenta como Diablo II LoD 1.14b con la versión 1.14.1.2 (la que manda la
+// DLL de OmbuServer, mod_lanzador.cpp), así pasa el versioncheck del servidor (desde los actos VI y VII ya no acepta la 1.14.1.1).
 package chat
 
 import (
@@ -49,13 +49,13 @@ var eventos = map[uint32]string{
 	0x0f: "channelrestricted", 0x12: "info", 0x13: "error", 0x17: "emote",
 }
 
-// Paquetes fijos del handshake (los mismos de chat.js; en AUTH_CHECK la versión va en 1.14.1.1 = 0x010e0101).
+// Paquetes fijos del handshake (los mismos de chat.js; en AUTH_CHECK la versión va en 1.14.1.2 = 0x010e0102).
 // SID_AUTH_INFO termina con el idioma y el país del cliente, y con eso PvPGN elige en qué idioma contesta
 // (localize_by_country): español de Argentina, o inglés de Estados Unidos si el launcher está en inglés.
 var (
 	authInfoES = authInfo("53457365", "0a2c0000", "0a0c0000", "ARG", "Argentina")     // esES, es-AR
 	authInfoEN = authInfo("53556e65", "09040000", "09040000", "USA", "United States") // enUS, en-US
-	authCheck  = deHex("ff519100010e577b01010e01de344bb20200000000000000100000000700000029cdb2000000000027312fd62ee2fd9c5c1611cbb53bd9015f5980bb100000000a000000526504000000000063a21dc9f96d8513133ba2e2f1915d0e1c2076e747616d652e6578652030312f30332f32302030363a30343a3337203335393031323000426c697a7a426f7947616d657300")
+	authCheck  = deHex("ff519100010e577b02010e01de344bb20200000000000000100000000700000029cdb2000000000027312fd62ee2fd9c5c1611cbb53bd9015f5980bb100000000a000000526504000000000063a21dc9f96d8513133ba2e2f1915d0e1c2076e747616d652e6578652030312f30332f32302030363a30343a3337203335393031323000426c697a7a426f7947616d657300")
 )
 
 func authInfoPara() []byte {

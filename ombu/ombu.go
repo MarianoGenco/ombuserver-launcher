@@ -13,7 +13,7 @@ package ombu
 // al compilar, sin tocar el código:
 //
 //	wails build ... -ldflags "-X ombuserver-launcher/ombu.URLContenido=http://<web>/contenido/
-//	                          -X ombuserver-launcher/ombu.IPRealm=<ip del juego> ..."
+//	                          -X ombuserver-launcher/ombu.IPRealm=<nombre o ip del juego> ..."
 //
 // (ver también URLDescargas en instalar.go y urlVoz en voz.go).
 var (

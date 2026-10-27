@@ -51,7 +51,37 @@ func (c *Cliente) Texto(ruta string) (string, error) {
 	}
 	defer r.Body.Close()
 	b, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err == nil && r.StatusCode == http.StatusOK {
+		textosMu.Lock()
+		textos[ruta] = textoGuardado{string(b), time.Now()}
+		textosMu.Unlock()
+	}
 	return string(b), err
+}
+
+// Lo ultimo que contesto el servidor por cada ruta (manifiesto de la DLL, version del MPQ). JUGAR lo reusa si es
+// reciente: el launcher ya lo consulta al abrirse y al volver a la ventana, y cada consulta por HTTPS suma ~0,6 s.
+type textoGuardado struct {
+	texto string
+	hora  time.Time
+}
+
+var (
+	textosMu sync.Mutex
+	textos   = map[string]textoGuardado{}
+)
+
+// textoReciente devuelve la ultima respuesta si tiene menos de maxEdad; si no, la pide de nuevo.
+func (c *Cliente) textoReciente(ruta string, maxEdad time.Duration) (string, error) {
+	if maxEdad > 0 {
+		textosMu.Lock()
+		g, ok := textos[ruta]
+		textosMu.Unlock()
+		if ok && time.Since(g.hora) < maxEdad {
+			return g.texto, nil
+		}
+	}
+	return c.Texto(ruta)
 }
 
 // Bajar guarda la ruta remota en destino y devuelve tamaño, md5 y crc32 (hex) de lo bajado.
@@ -121,7 +151,11 @@ func VersionLocalMPQ(carpetaDatos string) string {
 
 // VersionRemotaMPQ es el md5 publicado del MPQ.
 func (c *Cliente) VersionRemotaMPQ() (string, error) {
-	v, err := c.Texto(ArchivoVersion)
+	return c.versionRemotaMPQ(0)
+}
+
+func (c *Cliente) versionRemotaMPQ(maxEdad time.Duration) (string, error) {
+	v, err := c.textoReciente(ArchivoVersion, maxEdad)
 	return limpiar(v), err
 }
 
@@ -130,9 +164,14 @@ func (c *Cliente) VersionRemotaMPQ() (string, error) {
 // de lo bajado antes de reemplazar, y si el MPQ está abierto por el juego no lo pisa a medias.
 // Devuelve si cambió algo.
 func (c *Cliente) SincronizarMPQ(carpetaDatos string, p Progreso) (bool, error) {
+	return c.SincronizarMPQReciente(carpetaDatos, p, 0)
+}
+
+// SincronizarMPQReciente es SincronizarMPQ pero usa la version publicada que se consulto hace menos de maxEdad.
+func (c *Cliente) SincronizarMPQReciente(carpetaDatos string, p Progreso, maxEdad time.Duration) (bool, error) {
 	mpqMu.Lock() // JUGAR y el chat (figuras) pueden pedirlo a la vez: uno solo baja
 	defer mpqMu.Unlock()
-	remota, err := c.VersionRemotaMPQ()
+	remota, err := c.versionRemotaMPQ(maxEdad)
 	if err != nil {
 		return false, err
 	}
@@ -200,7 +239,13 @@ func CRC32Archivo(ruta string) (string, error) {
 // PendientesCliente compara el manifiesto publicado con la carpeta del juego. Solo considera los
 // nombres de ArchivosPermitidos (el resto del manifiesto se ignora y se avisa en el error).
 func (c *Cliente) PendientesCliente(carpetaJuego string) ([]Accion, int64, error) {
-	t, err := c.Texto(ManifiestoCliente)
+	return c.PendientesClienteReciente(carpetaJuego, 0)
+}
+
+// PendientesClienteReciente compara contra el manifiesto consultado hace menos de maxEdad (0 = pedirlo siempre).
+// Los CRC de los archivos locales se calculan siempre.
+func (c *Cliente) PendientesClienteReciente(carpetaJuego string, maxEdad time.Duration) ([]Accion, int64, error) {
+	t, err := c.textoReciente(ManifiestoCliente, maxEdad)
 	if err != nil {
 		return nil, 0, err
 	}

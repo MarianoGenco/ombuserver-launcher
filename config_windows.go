@@ -34,6 +34,9 @@ func leerConfigGuardada(c *Config) bool {
 	if v, _, err := k.GetIntegerValue("escala"); err == nil {
 		c.Escala = int(v)
 	}
+	if v, _, err := k.GetIntegerValue("vista"); err == nil {
+		c.Vista = int(v)
+	}
 	if v, _, err := k.GetIntegerValue("vozModo"); err == nil {
 		c.VozModo = int(v)
 	}
@@ -69,6 +72,7 @@ func escribirConfigGuardada(c Config) error {
 		k.SetDWordValue("sonido", b(c.Sonido)),
 		k.SetDWordValue("idioma", uint32(c.Idioma)),
 		k.SetDWordValue("escala", uint32(c.Escala)),
+		k.SetDWordValue("vista", uint32(c.Vista)),
 		k.SetDWordValue("vozModo", uint32(c.VozModo)),
 		k.SetDWordValue("vozTecla", uint32(c.VozTecla)),
 		k.SetStringValue("vozTeclaNombre", c.VozTeclaNombre),

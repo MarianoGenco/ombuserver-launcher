@@ -10,6 +10,7 @@ import (
 	"context"
 	"embed"
 	"log"
+	"net/http"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -21,12 +22,17 @@ import (
 var assets embed.FS
 
 // Version del launcher (se muestra abajo a la derecha).
-const Version = "1.1.4"
+const Version = "1.4.8"
 
 func main() {
 	limpiarActualizacion()
 	app := NuevaApp()
 	graficos := nuevosGraficos(app) // figuras del chat: las lee de ombuserver.mpq (graficos.go)
+	// lo que no está adentro del .exe: las figuras del chat y el puntero (la mano del juego, cursor.go)
+	externos := http.NewServeMux()
+	externos.Handle(prefijoGraficos, graficos)
+	cursor := nuevoCursor(app)
+	externos.Handle(prefijoCursor, cursor)
 	err := wails.Run(&options.App{
 		Title:            "OmbuServer",
 		Width:            1024,
@@ -34,11 +40,12 @@ func main() {
 		DisableResize:    true,
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 8, G: 9, B: 16, A: 255},
-		AssetServer:      &assetserver.Options{Assets: assets, Handler: graficos},
+		AssetServer:      &assetserver.Options{Assets: assets, Handler: externos},
 		OnShutdown:       app.cerrarJuegos, // cierra los Diablo II que abrió el launcher
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
 			go graficos.precargar()
+			go ponerCursorVentana(cursor) // la mano también en los bordes de la ventana (solo Windows)
 		},
 		Bind: []interface{}{app},
 		// Un solo launcher abierto: si lo abren de nuevo, se trae al frente el que ya está.

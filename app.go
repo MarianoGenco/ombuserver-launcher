@@ -23,14 +23,15 @@ import (
 // App es lo que la ventana ve (window.go.main.App.*). Cada método corre fuera del hilo de la
 // interfaz, así que puede bajar archivos sin trabar la ventana.
 type App struct {
-	ctx     context.Context
-	mu      sync.Mutex
-	cfg     Config
-	ocupado bool
-	cliente *ombu.Cliente
-	juego   *ombu.Manifiesto // archivos del juego publicados (se baja una vez por sesión)
-	sesion  sesionChat       // chat de Battle.net (chat_app.go)
-	ptt     teclaHablar      // tecla para hablar en la voz (voz.go)
+	ctx      context.Context
+	mu       sync.Mutex
+	cfg      Config
+	ocupado  bool
+	cliente  *ombu.Cliente
+	juego    *ombu.Manifiesto // archivos del juego publicados (se baja una vez por sesión)
+	sesion   sesionChat       // chat de Battle.net (chat_app.go)
+	ptt      teclaHablar      // tecla para hablar en la voz (voz.go)
+	mensajes sesionMensajes   // mensajes entre jugadores por los TRADES (mensajes.go)
 
 	// juegos abiertos con JUGAR: se cierran al cerrar el launcher (salvo cuando se cierra para actualizarse)
 	juegosMu       sync.Mutex
@@ -223,11 +224,11 @@ func (a *App) ElegirCarpeta() (Estado, error) {
 }
 
 // GuardarOpciones guarda lo que se cambió en la configuración.
-func (a *App) GuardarOpciones(ventanas, demora int, ventana, sonido bool, idioma, escala int) (Config, error) {
+func (a *App) GuardarOpciones(ventanas, demora int, ventana, sonido bool, idioma, escala, vista int) (Config, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c := a.cfg
-	c.Ventanas, c.Demora, c.Ventana, c.Sonido, c.Idioma, c.Escala = ventanas, demora, ventana, sonido, idioma, escala
+	c.Ventanas, c.Demora, c.Ventana, c.Sonido, c.Idioma, c.Escala, c.Vista = ventanas, demora, ventana, sonido, idioma, escala, vista
 	c = normalizar(c)
 	if err := guardarConfig(c); err != nil {
 		return a.cfg, err
@@ -303,6 +304,9 @@ func (a *App) Actualizar() (bool, error) {
 	return false, a.actualizarJuego(cfg)
 }
 
+// consultaReciente: cuanto vale lo ultimo que contesto el servidor para JUGAR sin volver a preguntar.
+const consultaReciente = 10 * time.Minute
+
 // actualizarJuego verifica el Game.exe y deja al día la DLL (carpeta del juego) y el contenido del
 // Mundo 6 (carpeta de datos).
 func (a *App) actualizarJuego(cfg Config) error {
@@ -317,7 +321,9 @@ func (a *App) actualizarJuego(cfg Config) error {
 		}
 		return errors.New("la carpeta elegida tiene otra versión de Diablo II: OmbuServer necesita la 1.14b")
 	}
-	acciones, _, err := a.cliente.PendientesCliente(cfg.Carpeta)
+	// JUGAR usa lo que contesto el servidor en los ultimos minutos (el launcher lo consulta al abrirse y al volver a
+	// la ventana): asi abre al instante en vez de esperar dos consultas por HTTPS. Los archivos locales se revisan igual.
+	acciones, _, err := a.cliente.PendientesClienteReciente(cfg.Carpeta, consultaReciente)
 	if err != nil {
 		return sinConexion(err)
 	}
@@ -327,9 +333,8 @@ func (a *App) actualizarJuego(cfg Config) error {
 			return sinConexion(err)
 		}
 	}
-	a.avisar("Buscando actualizaciones…", -1)
 	datos := ombu.CarpetaDatos(cfg.Carpeta, "")
-	if _, err := a.cliente.SincronizarMPQ(datos, a.barra("Bajando actualización…")); err != nil {
+	if _, err := a.cliente.SincronizarMPQReciente(datos, a.barra("Bajando actualización…"), consultaReciente); err != nil {
 		return sinConexion(err)
 	}
 	return nil
@@ -338,6 +343,25 @@ func (a *App) actualizarJuego(cfg Config) error {
 // Jugar deja todo al día y abre el juego: DLL de la carpeta del juego, contenido del Mundo 6,
 // registro de Windows (gateway de OmbuServer) y Game.exe (las ventanas que haya elegido).
 func (a *App) Jugar() error {
+	// Candado por HWID: si la maquina esta baneada, no se abre el juego (el frontend muestra BANEADO).
+	// Se usa el ultimo estado conocido (lo consulta el frontend al abrir el launcher): Jugar no espera a la red
+	// (antes la consulta sumaba ~2 s de "Preparando..."). Se refresca en segundo plano para la proxima vez.
+	ban := BanInfo{Hwid: hwidMaquina()}
+	if g := banGuardado(); g != nil {
+		ban = *g
+	}
+	go a.EstadoBaneo()
+	if ban.Baneado {
+		if ban.Motivo != "" {
+			return fmt.Errorf("BANEADO: %s", ban.Motivo)
+		}
+		return fmt.Errorf("BANEADO")
+	}
+	// Se lo pasamos al juego por el entorno: la DLL (mod_hwid.cpp) lo manda al D2GS asi coincide EXACTO
+	// con lo que el panel banea. Candado fuerte del lado del servidor del juego (ombu_hwid.c).
+	if ban.Hwid != "" {
+		os.Setenv("OMBU_HWID", ban.Hwid)
+	}
 	cfg, liberar, err := a.ocupar()
 	if err != nil {
 		return err
@@ -397,10 +421,12 @@ func sinConexion(err error) error {
 
 // Noticia del panel derecho (noticias.json publicado en el servidor).
 type Noticia struct {
-	Titulo string `json:"title"`
-	Texto  string `json:"text"`
-	Fecha  string `json:"date"`
-	Enlace string `json:"link"`
+	Titulo   string `json:"title"`
+	Texto    string `json:"text"`
+	TituloEn string `json:"title_en,omitempty"` // versión en inglés (la muestra app.js con el launcher en inglés)
+	TextoEn  string `json:"text_en,omitempty"`
+	Fecha    string `json:"date"`
+	Enlace   string `json:"link"`
 }
 
 var noticiasPorDefecto = []Noticia{{

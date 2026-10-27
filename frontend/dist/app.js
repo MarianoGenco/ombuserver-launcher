@@ -8,6 +8,9 @@ const api = enWails ? window.go.main.App : simulacion();
 const $ = (id) => document.getElementById(id);
 let estado = null;
 let trabajando = false;
+let baneado = false;
+let cargando = true;
+let jugandoMudo = false;  // JUGAR en curso sin mostrar nada en el boton      // al abrir: el boton muestra la carga hasta saber el estado real (juego + baneo)      // HWID baneado: el boton queda en rojo "BANEADO" y no deja jugar
 
 function mostrarEstado(e) {
   estado = e;
@@ -26,9 +29,12 @@ function aviso(tipo, texto) {
 }
 
 let avisoActualizado = true;
+let ultimaRevision = 0;
 
-async function revisar() {
-  aviso("trabajando", "Revisando…");
+// silencioso: sin el cartel "Revisando…" (al volver a la ventana; molestaba cada vez que se movía el launcher)
+async function revisar(silencioso) {
+  ultimaRevision = Date.now();
+  if (!silencioso) aviso("trabajando", "Revisando…");
   try {
     const e = await api.Estado();
     if (e.recien && avisoActualizado && e.aviso === "ok") {
@@ -51,6 +57,7 @@ async function elegirCarpeta() {
 
 // ---------- JUGAR ----------
 function botonTrabajando(texto, porcentaje) {
+  terminarCarga(true);
   const b = $("jugar");
   b.classList.add("trabajando");
   b.disabled = true;
@@ -60,6 +67,8 @@ function botonTrabajando(texto, porcentaje) {
 }
 
 function botonNormal() {
+  if (cargando) return;   // todavia no se sabe el estado: sigue la animacion de carga
+  if (baneado) { botonBaneado(); return; }
   const b = $("jugar");
   const accion = estado ? estado.accion : "";
   b.classList.remove("trabajando");
@@ -103,6 +112,7 @@ async function instalar() {
 }
 
 function botonGrande() {
+  if (baneado) return;
   const accion = estado ? estado.accion : "";
   if (accion === "actualizar") actualizar(); else if (accion === "instalar") instalar(); else jugar();
 }
@@ -110,23 +120,67 @@ function botonGrande() {
 async function jugar() {
   if (trabajando) return;
   trabajando = true;
-  botonTrabajando("Preparando…", -1);
+  jugandoMudo = true;   // el boton no cambia: solo la animacion de apretar (los pasos internos no se muestran)
   try {
     await api.Jugar();
     trabajando = false;
+    jugandoMudo = false;
     botonNormal();
-    aviso("ok", "Diablo II abierto. ¡Suerte!");
     setTimeout(revisar, 8000);
   } catch (err) {
     trabajando = false;
+    jugandoMudo = false;
     botonNormal();
     const m = String(err);
+    if (m.toUpperCase().includes("BANEADO")) {
+      mostrarBaneado(m.replace(/.*BANEADO:?\s*/i, ""));
+      return;
+    }
     aviso("error", m.charAt(0).toUpperCase() + m.slice(1));
   }
 }
 
+// ---------- BANEADO ----------
+// Solo el boton grande: rojo, letras blancas, "BANEADO", deshabilitado. El motivo va en el tooltip.
+let motivoBaneo = "";
+function botonBaneado() {
+  const b = $("jugar");
+  b.classList.remove("trabajando", "actualizar");
+  b.classList.add("baneado");
+  $("jugar-texto").textContent = "BANEADO";
+  $("jugar-relleno").style.width = "0";
+  b.disabled = true;
+  b.title = motivoBaneo;   // solo si hay un motivo real
+}
+function mostrarBaneado(motivo) {
+  baneado = true;
+  motivoBaneo = motivo || "";
+  if (!cargando) botonBaneado();
+}
+
+// Fin de la carga inicial: el boton aparece directo en su estado correcto, con una entrada suave.
+function terminarCarga(sinPintar) {
+  if (!cargando) return;
+  cargando = false;
+  const b = $("jugar");
+  b.classList.remove("cargando");
+  b.classList.add("aparecer");
+  setTimeout(() => b.classList.remove("aparecer"), 400);
+  if (!sinPintar) botonNormal();
+}
+
+async function verificarBaneo() {
+  if (!api.EstadoBaneo) return;
+  try {
+    const b = await api.EstadoBaneo();
+    if (b && b.baneado) mostrarBaneado(b.motivo);
+  } catch (e) { /* si el servidor no responde, no se bloquea (el candado real es del servidor del juego) */ }
+}
+
 function alProgreso(p) {
-  if (trabajando) botonTrabajando(p.texto, p.porcentaje);
+  if (!trabajando) return;
+  if (jugandoMudo && !(p.porcentaje >= 0)) return;   // al jugar solo se muestra una descarga real (con porcentaje)
+  botonTrabajando(p.texto, p.porcentaje);
 }
 
 // ---------- novedades ----------
@@ -164,7 +218,7 @@ async function cargarNoticias() {
 }
 
 // ---------- configuración (se guarda sola al cambiar algo) ----------
-const opciones = { ventanas: 1, demora: 3, ventana: true, sonido: true, idioma: 1, escala: 100 };
+const opciones = { ventanas: 1, demora: 3, ventana: true, sonido: true, idioma: 1, escala: 100, vista: 0 };
 let ocultarGuardado = null;
 
 function pintarOpciones() {
@@ -179,14 +233,14 @@ function pintarOpciones() {
   $("op-sonido").setAttribute("aria-checked", opciones.sonido ? "true" : "false");
   document.querySelectorAll("#op-idioma button").forEach((b) => b.classList.toggle("activo", Number(b.dataset.idioma) === opciones.idioma));
   document.querySelectorAll("#op-escala button").forEach((b) => b.classList.toggle("activo", Number(b.dataset.escala) === opciones.escala));
-  $("campo-escala").classList.toggle("deshabilitado", !opciones.ventana);
+  $("campo-escala").classList.toggle("deshabilitado", !opciones.ventana);   // solo en modo ventana (mod_vista.cpp)
   $("campo-demora").classList.toggle("deshabilitado", opciones.ventanas < 2);
 }
 
 async function guardarOpciones() {
   pintarOpciones();
   try {
-    const c = await api.GuardarOpciones(opciones.ventanas, opciones.demora, opciones.ventana, opciones.sonido, opciones.idioma, opciones.escala);
+    const c = await api.GuardarOpciones(opciones.ventanas, opciones.demora, opciones.ventana, opciones.sonido, opciones.idioma, opciones.escala, opciones.vista);
     if (estado) estado.config = c;
     const g = $("guardado");
     g.classList.add("visible");
@@ -227,6 +281,7 @@ function abrirOpciones() {
   if (estado) Object.assign(opciones, {
     ventanas: estado.config.ventanas, demora: estado.config.demora, ventana: estado.config.ventana,
     sonido: estado.config.sonido, idioma: estado.config.idioma, escala: estado.config.escala || 100,
+    vista: estado.config.vista || 0,
   });
   pintarOpciones();
   vozPintarOpciones();
@@ -234,6 +289,7 @@ function abrirOpciones() {
   $("opciones").hidden = false;
   $("principal").hidden = true;
   $("chat").hidden = true;
+  $("trades").hidden = true;
   marcarMenu("opciones");
 }
 
@@ -241,6 +297,7 @@ function cerrarOpciones() {
   $("opciones").hidden = true;
   $("principal").hidden = false;
   $("chat").hidden = true;
+  $("trades").hidden = true;
   marcarMenu("inicio");
 }
 
@@ -271,7 +328,8 @@ $("op-ventana").addEventListener("click", () => { opciones.ventana = !opciones.v
 $("op-sonido").addEventListener("click", () => { opciones.sonido = !opciones.sonido; guardarOpciones(); });
 document.querySelectorAll("#op-escala button").forEach((b) => b.addEventListener("click", () => {
   const v = Number(b.dataset.escala);
-  if (v !== opciones.escala) { opciones.escala = v; guardarOpciones(); }
+  // 800×600 = vista normal; 1200×900 = vista alejada (la partida a 1200×900, mod_vista.cpp)
+  if (v !== opciones.escala) { opciones.escala = v; opciones.vista = v === 150 ? 1 : 0; guardarOpciones(); }
 }));
 document.querySelectorAll("#op-idioma button").forEach((b) => b.addEventListener("click", () => {
   const v = Number(b.dataset.idioma);
@@ -284,6 +342,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("opci
 document.querySelectorAll(".menu-item").forEach((b) => b.addEventListener("click", () => {
   if (b.dataset.vista === "opciones") abrirOpciones();
   else if (b.dataset.vista === "chat") abrirChat();
+  else if (b.dataset.vista === "trades") abrirTrades();   // trades.js
   else cerrarOpciones();
 }));
 
@@ -294,7 +353,13 @@ $("cerrar").addEventListener("click", () => enWails ? window.runtime.Quit() : wi
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 if (enWails) window.runtime.EventsOn("progreso", alProgreso);
-revisar();
+// Al abrir se espera el estado del juego y el del baneo antes de mostrar el boton (antes pasaba por "Instalar LoD"
+// y despues "BANEADO"). El baneo espera hasta 3 s; si llega mas tarde, igual cambia el boton.
+Promise.allSettled([
+  revisar(),
+  Promise.race([verificarBaneo(), new Promise((r) => setTimeout(r, 3000))]),
+  new Promise((r) => setTimeout(r, 450)),   // minimo, para que la animacion no sea un parpadeo
+]).then(() => terminarCarga());
 
 // Si falta o cambia algo en la carpeta (por ejemplo, se borró un archivo), el botón se actualiza al instante.
 let firmaCarpeta = null;
@@ -307,7 +372,12 @@ async function chequearCarpeta() {
   } catch (_) { /* se reintenta en el proximo */ }
 }
 setInterval(chequearCarpeta, 3000);
-window.addEventListener("focus", () => { firmaCarpeta = null; revisar(); });
+// Al volver a la ventana se revisa en silencio y como mucho cada 30 s (mover la ventana también le devuelve el foco).
+window.addEventListener("focus", () => {
+  if (trabajando || Date.now() - ultimaRevision < 30000) return;
+  firmaCarpeta = null;
+  revisar(true);
+});
 cargarNoticias();
 
 // ---------- chat de Battle.net (pestaña CHAT) ----------
@@ -318,7 +388,8 @@ function escuchar(nombre, f) {
 }
 function emitir(nombre, dato) { (oyentes[nombre] || []).forEach((f) => f(dato)); }
 
-const chat = { estado: null, usuarios: new Map(), canal: "", susurrando: "", reignorar: null, ocultarRespuestas: 0 };
+// privado: la conversación de mensajes abierta en lugar del canal (mensajes.js), o null
+const chat = { estado: null, usuarios: new Map(), canal: "", susurrando: "", reignorar: null, ocultarRespuestas: 0, privado: null };
 // Rangos de Battle.net (bits de flags de PvPGN) -> figura del lobby (img/chat/rango-*.png), en el orden en que los
 // mira el juego (Game.exe 1.14b, FUN_00442340): con un rango se dibuja esa figura en lugar del personaje.
 const FLAGS = [[0x02, "operador"], [0x08, "moderador"], [0x01, "admin"], [0x04, "voz"]];
@@ -329,6 +400,7 @@ function abrirChat() {
   $("opciones").hidden = true;
   $("principal").hidden = true;
   $("chat").hidden = false;
+  $("trades").hidden = true;
   marcarMenu("chat");
   if (!$("chat-sala").hidden) $("sala-texto").focus();
 }
@@ -377,26 +449,38 @@ $("login-form").addEventListener("submit", async (ev) => {
   if (!cuenta || !clave) { loginMensaje("Completá la cuenta y la contraseña"); return; }
   entrarChat(cuenta, clave);
 });
-$("sala-salir").addEventListener("click", async () => { await api.ChatSalir(); chat.usuarios.clear(); $("sala-mensajes").textContent = ""; pintarUsuarios(); });
+$("sala-salir").addEventListener("click", async () => { await api.ChatSalir(); chat.usuarios.clear(); $("sala-mensajes").textContent = ""; pintarUsuarios(); mensajesCerrados(); });
 
 // delServidor: el texto lo manda Battle.net (ya viene en el idioma del launcher) y no se traduce; lo que escribe la
 // gente (msj-texto) tampoco.
-function agregarMensaje(clase, partes, delServidor) {
-  const caja = $("sala-mensajes");
+// Colores de Diablo II para los códigos ÿc0..ÿc; (los anuncios de torneo vienen en violeta, ÿc;)
+const COLORES_D2 = { "0": "#e8e6e1", "1": "#ff4d4d", "2": "#2ed12e", "3": "#7f7fff", "4": "#c7b377", "5": "#8a8a8a",
+  "6": "#3a3a3a", "7": "#b8a87a", "8": "#ff9a1f", "9": "#ffff64", ":": "#1d8c1d", ";": "#c35bff" };
+
+// caja: dónde se escribe (el canal, o la conversación privada de mensajes.js). Devuelve el renglón.
+function agregarMensaje(clase, partes, delServidor, caja) {
+  caja = caja || $("sala-mensajes");
   const abajo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 30;
   const p = document.createElement("div");
   p.className = "msj " + clase;
   if (delServidor) p.translate = false;
   for (const [c, t] of partes) {
-    const s = document.createElement("span");
-    if (c) s.className = c;
-    if (c === "msj-texto") s.translate = false;
-    s.textContent = t;
-    p.append(s);
+    // códigos de color de Diablo II en el texto ("ÿc;" violeta, "ÿc4" dorado...): un tramo por color
+    const tramos = String(t).split(/ÿc(.)/);
+    for (let k = 0; k < tramos.length; k += 2) {
+      if (!tramos[k]) continue;
+      const s = document.createElement("span");
+      if (c) s.className = c;
+      if (c === "msj-texto") s.translate = false;
+      if (k > 0 && COLORES_D2[tramos[k - 1]]) s.style.color = COLORES_D2[tramos[k - 1]];
+      s.textContent = tramos[k];
+      p.append(s);
+    }
   }
   caja.append(p);
   while (caja.children.length > 400) caja.firstChild.remove();
   if (abajo) caja.scrollTop = caja.scrollHeight;
+  return p;
 }
 
 function pintarUsuarios() {
@@ -491,6 +575,7 @@ $("sala-usuarios").addEventListener("wheel", (e) => {
 const prefijoSusurro = (cuenta) => `/w *${cuenta} `;
 
 function elegirSusurro(cuenta) {
+  if (chat.privado) cerrarPrivado();   // con una conversación de mensajes abierta, se vuelve al canal (mensajes.js)
   const t = $("sala-texto");
   const previo = chat.susurrando;
   if (previo && t.value.startsWith(prefijoSusurro(previo))) t.value = t.value.slice(prefijoSusurro(previo).length);
@@ -503,7 +588,16 @@ function elegirSusurro(cuenta) {
 }
 
 function soltarSusurro() {
-  if (chat.susurrando) elegirSusurro(chat.susurrando);
+  if (!chat.susurrando) return;
+  if (chat.privado) {
+    // conversación de mensajes abierta: se suelta en lo que quedó escrito para el canal, sin salir de la conversación
+    const pre = prefijoSusurro(chat.susurrando);
+    if (buzon.borrador.startsWith(pre)) buzon.borrador = buzon.borrador.slice(pre.length);
+    chat.susurrando = "";
+    pintarUsuarios();
+    return;
+  }
+  elegirSusurro(chat.susurrando);
 }
 
 // Ignorar (/squelch): el servidor deja de mandarnos lo que esa cuenta escribe o susurra y la marca con el flag 0x20,
@@ -610,6 +704,7 @@ $("sala-escribir").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const t = $("sala-texto").value.trim();
   if (!t) return;
+  if (chat.privado) { $("sala-texto").value = ""; enviarPrivado(t); return; }   // conversación de mensajes (mensajes.js)
   if (chat.susurrando && t === prefijoSusurro(chat.susurrando).trim()) return;   // solo el prefijo: nada que mandar
   $("sala-texto").value = chat.susurrando ? prefijoSusurro(chat.susurrando) : "";
   if (escrito.lista[escrito.lista.length - 1] !== t) escrito.lista.push(t);
@@ -641,8 +736,9 @@ $("sala-unirse-nombre").addEventListener("keydown", (e) => {
 escuchar("chat", alEventoChat);
 escuchar("chat-estado", (e) => {
   if (e && !e.conectado) chat.reignorar = null;   // conexión nueva: hay que volver a mandar los ignorados
-  if (e && !e.conectado && !e.pausado) { chat.usuarios.clear(); pintarUsuarios(); vozChatCerrado(); }
+  if (e && !e.conectado && !e.pausado) { chat.usuarios.clear(); pintarUsuarios(); vozChatCerrado(); mensajesCerrados(); }
   pintarChat(e);
+  if (e && (e.conectado || e.pausado)) mensajesAbiertos();   // mensajes.js
 });
 api.ChatEstado().then(pintarChat).catch(() => {});
 if (!enWails && /chat/.test(location.search)) {
@@ -666,7 +762,7 @@ function simulacion() {
       return false;
     },
     ElegirCarpeta: async () => ({ version: "1.0.4", config: { ...cfg }, juegoOk: true, aviso: "ok", mensaje: "El juego está al día." }),
-    GuardarOpciones: async (v, d, w, s, i, e) => Object.assign(cfg, { ventanas: v, demora: d, ventana: w, sonido: s, idioma: i, escala: e }),
+    GuardarOpciones: async (v, d, w, s, i, e, vi) => Object.assign(cfg, { ventanas: v, demora: d, ventana: w, sonido: s, idioma: i, escala: e, vista: vi }),
     GuardarVoz: async (m, t, n, s) => Object.assign(cfg, { vozModo: m, vozTecla: t, vozTeclaNombre: n, vozSensibilidad: s }),
     VozPermiso: async () => { throw new Error("la voz solo anda en el launcher"); },
     VozSilenciar: async () => {},

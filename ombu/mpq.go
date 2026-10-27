@@ -13,7 +13,8 @@ import (
 
 // Lector mínimo de MPQ (formato v1, el de Diablo II), para sacar archivos de ombuserver.mpq: las tablas de hash y de
 // bloques cifradas, archivos cifrados con la clave de su nombre, y sectores sin comprimir o con zlib (así lo arma
-// MOD/mpq.py crear). El MPQ no tiene lista de archivos: se busca por el nombre exacto, como hace el juego.
+// MOD/mpq.py crear). También lee los MPQ originales del juego (d2data.mpq...), que van con PKWARE (explode.go). El MPQ
+// no tiene lista de archivos: se busca por el nombre exacto, como hace el juego.
 
 const (
 	mpqExiste      = 0x80000000
@@ -25,6 +26,7 @@ const (
 	mpqImplode     = 0x00000100
 	mpqSinBloque   = 0xFFFFFFFF
 	mpqCompZlib    = 0x02
+	mpqCompPKWARE  = 0x08
 	mpqTopeArchivo = 64 << 20
 )
 
@@ -178,9 +180,6 @@ func (m *MPQ) leerBloque(bl entradaBloque, nombre string) ([]byte, error) {
 	if bl.tamano > mpqTopeArchivo || bl.comprimido > mpqTopeArchivo {
 		return nil, errors.New(nombre + ": demasiado grande")
 	}
-	if bl.banderas&mpqImplode != 0 {
-		return nil, errors.New(nombre + ": compresión PKWARE no soportada")
-	}
 	crudo := make([]byte, bl.comprimido)
 	if _, err := m.f.ReadAt(crudo, m.base+int64(bl.pos)); err != nil && err != io.EOF {
 		return nil, err
@@ -193,12 +192,13 @@ func (m *MPQ) leerBloque(bl entradaBloque, nombre string) ([]byte, error) {
 			clave = (clave + bl.pos) ^ bl.tamano
 		}
 	}
-	comprimido := bl.banderas&mpqComprimido != 0
+	comprimido := bl.banderas&(mpqComprimido|mpqImplode) != 0
+	implode := bl.banderas&mpqImplode != 0 // sectores PKWARE sin el byte que dice la compresión
 	if bl.banderas&mpqUnSolo != 0 {
 		if clave != 0 {
 			descifrarBytes(crudo, clave)
 		}
-		return descomprimir(crudo, int(bl.tamano), comprimido)
+		return descomprimir(crudo, int(bl.tamano), comprimido, implode)
 	}
 	nSect := (int64(bl.tamano) + m.sector - 1) / m.sector
 	salida := make([]byte, 0, bl.tamano)
@@ -238,7 +238,7 @@ func (m *MPQ) leerBloque(bl entradaBloque, nombre string) ([]byte, error) {
 			descifrarBytes(s, clave+uint32(i))
 		}
 		esperado := int(min(m.sector, int64(bl.tamano)-i*m.sector))
-		d, err := descomprimir(s, esperado, true)
+		d, err := descomprimir(s, esperado, true, implode)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", nombre, err)
 		}
@@ -251,10 +251,16 @@ func (m *MPQ) leerBloque(bl entradaBloque, nombre string) ([]byte, error) {
 }
 
 // descomprimir un sector: si ocupa lo mismo que el original va sin comprimir; si no, el primer byte dice la
-// compresión (solo zlib).
-func descomprimir(s []byte, esperado int, comprimido bool) ([]byte, error) {
+// compresión (zlib o PKWARE), salvo en los archivos "implode", que son PKWARE sin ese byte.
+func descomprimir(s []byte, esperado int, comprimido, implode bool) ([]byte, error) {
 	if !comprimido || len(s) >= esperado {
 		return s[:min(len(s), esperado)], nil
+	}
+	if implode {
+		return explotar(s, esperado)
+	}
+	if len(s) > 0 && s[0] == mpqCompPKWARE {
+		return explotar(s[1:], esperado)
 	}
 	if len(s) == 0 || s[0] != mpqCompZlib {
 		return nil, fmt.Errorf("compresión no soportada (0x%02x)", s[0])
